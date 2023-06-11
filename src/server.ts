@@ -3,6 +3,9 @@ import { Logger, logger } from "./log.ts";
 
 const log0: Logger = logger(import.meta.url);
 
+// TODO: server: keep track of all clients.
+// TODO: server: re-send messages to all clients, except to the one that sent it.
+
 export async function beServer(
   options: ListenOptions,
   onmessage: OnMessage<T>,
@@ -11,6 +14,7 @@ export async function beServer(
 ): Promise<BeingResult> {
   const log: Logger = log0.sub(beServer.name);
   const { hostname, port } = options;
+  const clients: WebSocket[] = [];
   log(`Becoming the server at ${hostname}:${port}...`);
 
   let listener: Deno.Listener | undefined = undefined;
@@ -22,7 +26,7 @@ export async function beServer(
     listener = Deno.listen({ port, hostname });
     log(`Became the server at ${hostname}:${port}.`);
     for await (const conn of listener) {
-      void handleHttp(conn, onmessage, messageGenerator, abortSignal);
+      void handleHttp(clients, conn, onmessage, messageGenerator, abortSignal);
     }
   } catch (e) {
     if (e.code === "EADDRINUSE") {
@@ -42,6 +46,7 @@ export async function beServer(
 }
 
 async function handleHttp<T>(
+  clients: WebSocket[],
   conn: Deno.Conn,
   onmessage: OnMessage<T>,
   messageGenerator: EventTarget,
@@ -62,6 +67,8 @@ async function handleHttp<T>(
       }
 
       socket.onopen = () => {
+        log.sub("onopen")("socket is open.");
+        clients.push(socket);
         socket.send(`Hello from ${Deno.pid}.`);
         abortSignal.addEventListener("abort", socketCloser);
         messageGenerator.addEventListener("message", messageListener);
@@ -69,9 +76,13 @@ async function handleHttp<T>(
       socket.onmessage = (e: MessageEvent) => {
         log.sub("onmessage")(e.data);
         onmessage(e.data);
+        clients.filter((client) => client !== socket).forEach((client) => {
+          client.send(e.data);
+        });
       };
       socket.onclose = () => {
         log.sub("onclose")("");
+        clients.splice(clients.indexOf(socket), 1);
         messageGenerator.removeEventListener("message", messageListener);
         abortSignal.removeEventListener("abort", socketCloser);
       };

@@ -10,29 +10,33 @@ export async function beClient<T>(
   abortSignal: AbortSignal,
 ): Promise<BeingResult> {
   const log1: Logger = log0.sub(beClient.name);
-  const socket = await connectToWebSocket(options);
+  const socket: WebSocket = await connectToWebSocket(options);
   function messageListener(e: MessageEvent) {
+    log1.sub("messageListener")("you typed:", e.data);
     socket.send(e.data);
   }
   function socketCloser() {
+    log1.sub("socketCloser")("closing socket...");
     socket.close();
   }
   abortSignal.addEventListener("abort", socketCloser);
-  socket.onopen = () => {
+  socket.addEventListener("open", () => {
+    log1.sub("socket.onopen")("socket is open.");
     messageGenerator.addEventListener("message", messageListener);
-  };
-  socket.onmessage = (e: MessageEvent) => {
+  });
+  socket.addEventListener("message", (e: MessageEvent) => {
+    log1.sub("socket.onmessage")("server says:", e.data);
     onmessage(e.data);
-  };
+  });
   return new Promise((resolve, reject) => {
-    socket.onclose = () => {
+    socket.addEventListener("close", () => {
       const log = log1.sub("onclose");
       messageGenerator.removeEventListener("message", messageListener);
       const result: BeingResult = abortSignal.aborted ? "stop" : "try_next";
       log(result);
       resolve(result);
-    };
-    socket.onerror = (e: Event) => {
+    });
+    socket.addEventListener("error", (e: Event) => {
       const log = log1.sub("onerror");
       if (e instanceof ErrorEvent && e?.message === "unexpected eof") {
         log("webSocket lost connection to server.");
@@ -44,7 +48,7 @@ export async function beClient<T>(
       const result: BeingResult = abortSignal.aborted ? "stop" : "try_next";
       log(result);
       resolve(result);
-    };
+    });
   });
 }
 
@@ -56,9 +60,5 @@ export async function connectToWebSocket(
 ): Promise<WebSocket> {
   const { hostname, port } = options;
   const url = `ws://${hostname}:${port}`;
-  const socket = new WebSocket(url);
-  await new Promise((resolve) => {
-    socket.onopen = resolve;
-  });
-  return socket;
+  return new WebSocket(url);
 }
