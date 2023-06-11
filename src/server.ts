@@ -29,7 +29,7 @@ export async function beServer(
       log(
         "Can't server, because address in use. Try being something else instead...",
       );
-      return "try_next";
+      return abortSignal.aborted ? "stop" : "try_next";
     } else {
       log("Unexpected error:", e);
       throw e;
@@ -38,7 +38,7 @@ export async function beServer(
     log(`No longer the server at ${hostname}:${port}.`);
     abortSignal.removeEventListener("abort", listenerCloser);
   }
-  return "retry";
+  return abortSignal.aborted ? "stop" : "retry";
 }
 
 async function handleHttp<T>(

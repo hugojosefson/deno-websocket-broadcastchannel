@@ -14,6 +14,10 @@ export async function beClient<T>(
   function messageListener(e: MessageEvent) {
     socket.send(e.data);
   }
+  function socketCloser() {
+    socket.close();
+  }
+  abortSignal.addEventListener("abort", socketCloser);
   socket.onopen = () => {
     messageGenerator.addEventListener("message", messageListener);
   };
@@ -24,7 +28,7 @@ export async function beClient<T>(
     socket.onclose = () => {
       const log = log1.sub("onclose");
       messageGenerator.removeEventListener("message", messageListener);
-      const result: BeingResult = "try_next";
+      const result: BeingResult = abortSignal.aborted ? "stop" : "try_next";
       log(result);
       resolve(result);
     };
@@ -37,7 +41,7 @@ export async function beClient<T>(
         reject(e);
       }
       messageGenerator.removeEventListener("message", messageListener);
-      const result: BeingResult = "try_next";
+      const result: BeingResult = abortSignal.aborted ? "stop" : "try_next";
       log(result);
       resolve(result);
     };
