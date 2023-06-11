@@ -8,31 +8,43 @@ export async function beClient<T>(
   onmessage: OnMessage<T>,
   messageGenerator: EventTarget,
 ): Promise<BeingResult> {
-  const log: Logger = log0.sub(beClient.name);
-  const webSocket = await connectToWebSocket(options);
-  webSocket.onopen = () => {
-    messageGenerator.addEventListener("message", (e: MessageEvent) => {
-      webSocket.send(e.data);
-    });
+  const log1: Logger = log0.sub(beClient.name);
+  const socket = await connectToWebSocket(options);
+  function messageListener(e: MessageEvent) {
+    socket.send(e.data);
+  }
+  socket.onopen = () => {
+    messageGenerator.addEventListener("message", messageListener);
   };
-  webSocket.onmessage = (e: MessageEvent) => {
+  socket.onmessage = (e: MessageEvent) => {
     onmessage(e.data);
   };
-  try {
-    await new Promise((resolve, reject) => {
-      webSocket.onclose = resolve;
-      webSocket.onerror = reject;
-    });
-    log("webSocket closed.");
-    return { shouldTryNextBeing: true, shouldRetryMe: false };
-  } catch (e) {
-    if (e instanceof ErrorEvent && e?.message === "unexpected eof") {
-      log("webSocket lost connection to server.");
-    } else {
-      log("Unexpected error from webSocket:", e);
-    }
-    return { shouldTryNextBeing: true, shouldRetryMe: false };
-  }
+  return new Promise((resolve, reject) => {
+    socket.onclose = () => {
+      const result: BeingResult = {
+        shouldRetryMe: false,
+        shouldTryNextBeing: true,
+      };
+      log1.sub("onclose")(result);
+      messageGenerator.removeEventListener("message", messageListener);
+      resolve(result);
+    };
+    socket.onerror = (e: Event) => {
+      const log = log1.sub("onerror");
+      if (e instanceof ErrorEvent && e?.message === "unexpected eof") {
+        log("webSocket lost connection to server.");
+      } else {
+        log("Unexpected error from webSocket:", e);
+        reject(e);
+      }
+      messageGenerator.removeEventListener("message", messageListener);
+      const result: BeingResult = {
+        shouldRetryMe: false,
+        shouldTryNextBeing: true,
+      };
+      resolve(result);
+    };
+  });
 }
 
 /**

@@ -43,9 +43,11 @@ async function handleHttp<T>(
       const { request } = requestEvent;
       const { socket, response } = Deno.upgradeWebSocket(request);
       const log = log1.sub("webSocket");
-      const messageListener = (e: MessageEvent) => {
+
+      function messageListener(e: MessageEvent) {
         socket.send(e.data);
-      };
+      }
+
       socket.onopen = () => {
         socket.send(`Hello from ${Deno.pid}.`);
         messageGenerator.addEventListener("message", messageListener);

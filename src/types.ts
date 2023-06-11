@@ -10,8 +10,8 @@ export const DEFAULT_LISTEN_OPTIONS: ListenOptions = {
 
 export type Being = (listenOptions: ListenOptions) => Promise<BeingResult>;
 export type BeingResult = {
-  shouldTryNextBeing: boolean;
   shouldRetryMe: boolean;
+  shouldTryNextBeing: boolean;
 };
 
 export type OnMessage<T> = (message: T) => void;
