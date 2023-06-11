@@ -7,13 +7,14 @@ export async function alternatingLoop<T>(
   options: ListenOptions,
   beings: Being[],
   onmessage: OnMessage<T>,
+  messageGenerator: EventTarget,
 ): Promise<BeingResult> {
   let i = 0;
   while (true) {
     const being: Being = beings[i];
     let result: BeingResult;
     do {
-      result = await being(options, onmessage);
+      result = await being(options, onmessage, messageGenerator);
       await sleep(DEFAULT_SLEEP_DURATION_MS, log);
     } while (result.shouldRetryMe);
 

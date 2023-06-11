@@ -6,9 +6,15 @@ const log0: Logger = logger(import.meta.url);
 export async function beClient<T>(
   options: ListenOptions,
   onmessage: OnMessage<T>,
+  messageGenerator: EventTarget,
 ): Promise<BeingResult> {
   const log: Logger = log0.sub(beClient.name);
   const webSocket = await connectToWebSocket(options);
+  webSocket.onopen = () => {
+    messageGenerator.addEventListener("message", (e: MessageEvent) => {
+      webSocket.send(e.data);
+    });
+  };
   webSocket.onmessage = (e: MessageEvent) => {
     onmessage(e.data);
   };
