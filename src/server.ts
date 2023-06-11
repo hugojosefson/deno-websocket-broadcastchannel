@@ -1,10 +1,11 @@
-import { BeingResult, ListenOptions } from "./types.ts";
+import { BeingResult, ListenOptions, OnMessage } from "./types.ts";
 import { Logger, logger } from "./log.ts";
 
 const log0: Logger = logger(import.meta.url);
 
 export async function beServer(
   options: ListenOptions,
+  onmessage: OnMessage<T>,
 ): Promise<BeingResult> {
   const log: Logger = log0.sub(beServer.name);
   const { hostname, port } = options;
@@ -14,7 +15,7 @@ export async function beServer(
     const listener: Deno.Listener = Deno.listen({ port, hostname });
     log(`Became the server at ${hostname}:${port}.`);
     for await (const conn of listener) {
-      void handleHttp(conn);
+      void handleHttp(conn, onmessage);
     }
   } catch (e) {
     if (e.code === "EADDRINUSE") {
@@ -30,7 +31,7 @@ export async function beServer(
   return { shouldTryNextBeing: false, shouldRetryMe: true };
 }
 
-async function handleHttp(conn: Deno.Conn) {
+async function handleHttp<T>(conn: Deno.Conn, onmessage: OnMessage<T>) {
   const log: Logger = log0.sub(handleHttp.name);
   for await (const requestEvent of Deno.serveHttp(conn)) {
     if (requestEvent) {
@@ -39,9 +40,8 @@ async function handleHttp(conn: Deno.Conn) {
       socket.onopen = () => {
         socket.send(`Hello from ${Deno.pid}.`);
       };
-      socket.onmessage = (e) => {
-        log(e.data);
-        socket.close();
+      socket.onmessage = (e: MessageEvent) => {
+        onmessage(e.data);
       };
       socket.onclose = () => log("WebSocket has been closed.");
       socket.onerror = (e) =>

@@ -1,27 +1,32 @@
-import { BeingResult, ListenOptions } from "./types.ts";
+import { BeingResult, ListenOptions, OnMessage } from "./types.ts";
 import { Logger, logger } from "./log.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export async function beClient(
+export async function beClient<T>(
   options: ListenOptions,
+  onmessage: OnMessage<T>,
 ): Promise<BeingResult> {
   const log: Logger = log0.sub(beClient.name);
   const webSocket = await connectToWebSocket(options);
-  webSocket.onmessage = (e) => {
-    log(e.data);
+  webSocket.onmessage = (e: MessageEvent) => {
+    onmessage(e.data);
   };
-  webSocket.onerror = (e: Event | ErrorEvent) => {
-    if (e instanceof ErrorEvent) {
-      log("error", e?.message ?? e);
+  try {
+    await new Promise((resolve, reject) => {
+      webSocket.onclose = resolve;
+      webSocket.onerror = reject;
+    });
+    log("webSocket closed.");
+    return { shouldTryNextBeing: true, shouldRetryMe: false };
+  } catch (e) {
+    if (e instanceof ErrorEvent && e?.message === "unexpected eof") {
+      log("webSocket lost connection to server.");
     } else {
-      log("error", e);
+      log("Unexpected error from webSocket:", e);
     }
-  };
-  await new Promise((resolve) => {
-    webSocket.onclose = resolve;
-  });
-  return { shouldTryNextBeing: true, shouldRetryMe: false };
+    return { shouldTryNextBeing: true, shouldRetryMe: false };
+  }
 }
 
 /**

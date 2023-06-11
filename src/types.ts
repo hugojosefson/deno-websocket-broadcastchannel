@@ -13,3 +13,5 @@ export type BeingResult = {
   shouldTryNextBeing: boolean;
   shouldRetryMe: boolean;
 };
+
+export type OnMessage<T> = (message: T) => void;

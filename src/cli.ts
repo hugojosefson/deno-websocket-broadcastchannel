@@ -15,8 +15,18 @@ async function main(options: ListenOptions = DEFAULT_LISTEN_OPTIONS) {
     ...options,
   };
   const log: Logger = log0.sub(main.name);
+  log("continuously reading from stdin");
+  const stdinIterable = Deno.stdin.readable;
+  for await (const chunk of stdinIterable) {
+    log("chunk =", chunk);
+  }
+
   log("starting alternating loop");
-  const result = await alternatingLoop(listenOptions, [beServer, beClient]);
+  const result = await alternatingLoop(
+    listenOptions,
+    [beServer, beClient],
+    log.sub("alternatingLoop").sub("onmessage"),
+  );
   log("alternating loop ended: ", result);
 }
 
