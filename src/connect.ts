@@ -1,9 +1,10 @@
-import { logger } from "./log.ts";
-const log0 = logger(import.meta.url);
+import { Logger, logger } from "./log.ts";
+const log0: Logger = logger(import.meta.url);
+
 /**
  * Alternates between attempting to connect to a WebSocket server hosted by another process, and being a WebSocket server.
  */
-export async function connectWebSocket(
+export async function asClientConnectWebSocket(
   options: ListenOptions,
 ): Promise<WebSocket> {
   const { hostname, port } = options;
@@ -14,11 +15,12 @@ export async function connectWebSocket(
   });
   return socket;
 }
-export async function connectAsClient(
+
+export async function beClient(
   options: ListenOptions,
 ): Promise<void> {
-  const log = log0.sub("connectAsClient");
-  const socket = await connectWebSocket(options);
+  const log: Logger = log0.sub(beClient.name);
+  const socket = await asClientConnectWebSocket(options);
   socket.onmessage = (e) => {
     log(e.data);
   };
@@ -37,7 +39,7 @@ export async function connectAsClient(
 export async function beServer(
   options: ListenOptions,
 ): Promise<void> {
-  const log = log0.sub("beServer");
+  const log: Logger = log0.sub(beServer.name);
   const { hostname, port } = options;
   log(`Becoming the server at ${hostname}:${port}...`);
   async function handleHttp(conn: Deno.Conn) {
@@ -57,16 +59,19 @@ export async function beServer(
             "WebSocket error:",
             e instanceof ErrorEvent ? e?.message ?? e : e,
           );
-        e.respondWith(response);
+        await e.respondWith(response);
       }
     }
   }
 
-  const listener = Deno.listen({ port, hostname });
+  const listener: Deno.Listener = Deno.listen({ port, hostname });
   log(`Became the server at ${hostname}:${port}.`);
   for await (const conn of listener) {
-    handleHttp(conn);
+    void handleHttp(conn);
   }
 }
 
-export type ListenOptions = Required<Deno.TcpListenOptions>;
+export interface ListenOptions {
+  hostname: string;
+  port: number;
+}
