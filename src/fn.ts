@@ -1,3 +1,5 @@
+import { Logger, logger } from "./log.ts";
+
 /**
  * Checks if we are definitively allowed to access a given environment variable.
  * @param variable The name of the environment variable.
@@ -11,7 +13,7 @@ export async function isAllowedEnv(variable: string): Promise<boolean> {
 
 /**
  * Gets an environment variable, but only if getting it is allowed already.
- * @param key The name of the environment variable.
+ * @param variable The name of the environment variable.
  * @returns The value of the environment variable, or undefined if it is not
  * allowed, or not set.
  */
@@ -30,3 +32,13 @@ export async function weakEnvGet(
 export async function isDenoDeploy(): Promise<boolean> {
   return (await weakEnvGet("DENO_DEPLOYMENT_ID")) !== undefined;
 }
+
+export async function sleep(
+  ms: number,
+  log: Logger = logger(import.meta.url),
+): Promise<void> {
+  log(`sleep(${ms}ms)...`);
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export const DEFAULT_SLEEP_DURATION_MS = 50;
