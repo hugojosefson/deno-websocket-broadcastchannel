@@ -7,6 +7,7 @@ export async function beClient<T>(
   options: ListenOptions,
   onmessage: OnMessage<T>,
   messageGenerator: EventTarget,
+  abortSignal: AbortSignal,
 ): Promise<BeingResult> {
   const log1: Logger = log0.sub(beClient.name);
   const socket = await connectToWebSocket(options);
@@ -21,12 +22,10 @@ export async function beClient<T>(
   };
   return new Promise((resolve, reject) => {
     socket.onclose = () => {
-      const result: BeingResult = {
-        shouldRetryMe: false,
-        shouldTryNextBeing: true,
-      };
-      log1.sub("onclose")(result);
+      const log = log1.sub("onclose");
       messageGenerator.removeEventListener("message", messageListener);
+      const result: BeingResult = "try_next";
+      log(result);
       resolve(result);
     };
     socket.onerror = (e: Event) => {
@@ -38,10 +37,8 @@ export async function beClient<T>(
         reject(e);
       }
       messageGenerator.removeEventListener("message", messageListener);
-      const result: BeingResult = {
-        shouldRetryMe: false,
-        shouldTryNextBeing: true,
-      };
+      const result: BeingResult = "try_next";
+      log(result);
       resolve(result);
     };
   });

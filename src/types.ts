@@ -9,10 +9,7 @@ export const DEFAULT_LISTEN_OPTIONS: ListenOptions = {
 };
 
 export type Being = (listenOptions: ListenOptions) => Promise<BeingResult>;
-export type BeingResult = {
-  shouldRetryMe: boolean;
-  shouldTryNextBeing: boolean;
-};
+export type BeingResult = "retry" | "try_next" | "stop";
 
 export type OnMessage<T> = (message: T) => void;
 

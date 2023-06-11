@@ -8,18 +8,19 @@ export async function alternatingLoop<T>(
   beings: Being[],
   onmessage: OnMessage<T>,
   messageGenerator: EventTarget,
+  abortSignal: AbortSignal,
 ): Promise<BeingResult> {
   let i = 0;
   while (true) {
     const being: Being = beings[i];
     let result: BeingResult;
     do {
-      result = await being(options, onmessage, messageGenerator);
+      result = await being(options, onmessage, messageGenerator, abortSignal);
       log("result", result);
       await sleep(DEFAULT_SLEEP_DURATION_MS, log);
-    } while (result.shouldRetryMe);
+    } while (result === "retry");
 
-    if (result.shouldTryNextBeing) {
+    if (result === "try_next") {
       i = (i + 1) % beings.length;
       continue;
     }

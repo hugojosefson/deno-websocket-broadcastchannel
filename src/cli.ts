@@ -17,6 +17,7 @@ async function main(options: ListenOptions = DEFAULT_LISTEN_OPTIONS) {
   const log: Logger = log0.sub(main.name);
 
   const messageGenerator: EventTarget = new EventTarget();
+  const abortController = new AbortController();
 
   log("starting alternating loop");
   const resultPromise = alternatingLoop(
@@ -24,6 +25,7 @@ async function main(options: ListenOptions = DEFAULT_LISTEN_OPTIONS) {
     [beServer, beClient],
     log.sub("alternatingLoop").sub("onmessage"),
     messageGenerator,
+    abortController.signal,
   );
 
   log("continuously reading from stdin");
@@ -33,6 +35,9 @@ async function main(options: ListenOptions = DEFAULT_LISTEN_OPTIONS) {
     log("stdin text =", text);
     messageGenerator.dispatchEvent(new MessageEvent("message", { data: text }));
   }
+
+  log("stdin closed, aborting");
+  abortController.abort();
 
   log("waiting for alternating loop to end");
   const result = await resultPromise;
