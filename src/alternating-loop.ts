@@ -15,6 +15,7 @@ export async function alternatingLoop<T>(
     let result: BeingResult;
     do {
       result = await being(options, onmessage, messageGenerator);
+      log("result", result);
       await sleep(DEFAULT_SLEEP_DURATION_MS, log);
     } while (result.shouldRetryMe);
 
