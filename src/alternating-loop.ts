@@ -1,11 +1,11 @@
+import { DEFAULT_SLEEP_DURATION_MS, sleep } from "./fn.ts";
+import { logger } from "./log.ts";
 import {
   Connector,
   ConnectorOptions,
   ConnectorResult,
   OnMessage,
-} from "./types.ts";
-import { DEFAULT_SLEEP_DURATION_MS, sleep } from "./fn.ts";
-import { logger } from "./log.ts";
+} from "./connector/mod.ts";
 
 const log = logger(import.meta.url);
 export async function alternatingLoop<T>(

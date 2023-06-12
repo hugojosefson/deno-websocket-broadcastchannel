@@ -33,6 +33,7 @@ export async function isDenoDeploy(): Promise<boolean> {
   return (await weakEnvGet("DENO_DEPLOYMENT_ID")) !== undefined;
 }
 
+export const DEFAULT_SLEEP_DURATION_MS = 50;
 export async function sleep(
   ms: number,
   log: Logger = logger(import.meta.url),
@@ -40,5 +41,3 @@ export async function sleep(
   log(`sleep(${ms}ms)...`);
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-export const DEFAULT_SLEEP_DURATION_MS = 50;

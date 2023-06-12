@@ -1,10 +1,11 @@
-import { ConnectorOptions, ConnectorResult, OnMessage } from "./types.ts";
 import { Logger, logger } from "./log.ts";
+import {
+  ConnectorOptions,
+  ConnectorResult,
+  OnMessage,
+} from "./connector/mod.ts";
 
 const log0: Logger = logger(import.meta.url);
-
-// TODO: server: keep track of all clients.
-// TODO: server: re-send messages to all clients, except to the one that sent it.
 
 export async function beServer<T>(
   options: ConnectorOptions,
@@ -18,9 +19,7 @@ export async function beServer<T>(
   log(`Becoming the server at ${hostname}:${port}...`);
 
   let listener: Deno.Listener | undefined = undefined;
-  function listenerCloser() {
-    listener?.close();
-  }
+  const listenerCloser = () => listener?.close();
   abortSignal.addEventListener("abort", listenerCloser);
   try {
     listener = Deno.listen({ port, hostname });
@@ -51,7 +50,7 @@ async function handleHttp<T>(
   onmessage: OnMessage<T>,
   messageGenerator: EventTarget,
   abortSignal: AbortSignal,
-) {
+): Promise<void> {
   const log1: Logger = log0.sub(handleHttp.name);
   for await (const requestEvent of Deno.serveHttp(conn)) {
     if (requestEvent) {
@@ -79,9 +78,9 @@ async function handleHttp<T>(
       socket.onmessage = (e: MessageEvent) => {
         log.sub("onmessage")(e.data);
         onmessage(e.data);
-        clients.filter((client) => client !== socket).forEach((client) => {
-          client.send(e.data);
-        });
+        clients
+          .filter((client) => client !== socket)
+          .forEach((client) => client.send(e.data));
       };
       socket.onclose = () => {
         log.sub("onclose")("");

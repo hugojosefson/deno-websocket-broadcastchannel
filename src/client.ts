@@ -1,5 +1,9 @@
-import { ConnectorOptions, ConnectorResult, OnMessage } from "./types.ts";
 import { Logger, logger } from "./log.ts";
+import {
+  ConnectorOptions,
+  ConnectorResult,
+  OnMessage,
+} from "./connector/mod.ts";
 
 const log0: Logger = logger(import.meta.url);
 
