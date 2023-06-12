@@ -9,7 +9,7 @@ export const DEFAULT_CONNECTOR_OPTIONS: ConnectorOptions = {
 };
 export type OnMessage<T> = (message: T) => void;
 export type Connector<T> = (
-  listenOptions: ConnectorOptions,
+  connectorOptions: ConnectorOptions,
   onmessage: OnMessage<T>,
   messageGenerator: EventTarget,
   abortSignal: AbortSignal,
