@@ -1,17 +1,20 @@
-import { BeingResult, ListenOptions, OnMessage } from "./types.ts";
+import { ConnectorOptions, ConnectorResult, OnMessage } from "./types.ts";
 import { Logger, logger } from "./log.ts";
 
 const log0: Logger = logger(import.meta.url);
 
 export async function beClient<T>(
-  options: ListenOptions,
+  options: ConnectorOptions,
   onmessage: OnMessage<T>,
   messageGenerator: EventTarget,
   abortSignal: AbortSignal,
-): Promise<BeingResult> {
+): Promise<ConnectorResult> {
   const log1: Logger = log0.sub(beClient.name);
-  const socket: WebSocket = await connectToWebSocket(options);
-  function messageListener(e: MessageEvent) {
+  const socket: WebSocket = connectToWebSocket(options);
+  function messageListener(e: Event) {
+    if (!(e instanceof MessageEvent)) {
+      return;
+    }
     log1.sub("messageListener")("you typed:", e.data);
     socket.send(e.data);
   }
@@ -28,11 +31,11 @@ export async function beClient<T>(
     log1.sub("socket.onmessage")("server says:", e.data);
     onmessage(e.data);
   });
-  return new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     socket.addEventListener("close", () => {
       const log = log1.sub("onclose");
       messageGenerator.removeEventListener("message", messageListener);
-      const result: BeingResult = abortSignal.aborted ? "stop" : "try_next";
+      const result: ConnectorResult = abortSignal.aborted ? "stop" : "try_next";
       log(result);
       resolve(result);
     });
@@ -45,7 +48,7 @@ export async function beClient<T>(
         reject(e);
       }
       messageGenerator.removeEventListener("message", messageListener);
-      const result: BeingResult = abortSignal.aborted ? "stop" : "try_next";
+      const result: ConnectorResult = abortSignal.aborted ? "stop" : "try_next";
       log(result);
       resolve(result);
     });
@@ -53,11 +56,11 @@ export async function beClient<T>(
 }
 
 /**
- * Alternates between attempting to connect to a WebSocket server hosted by another process, and being a WebSocket server.
+ * Connect as a client, to a WebSocket server.
  */
-export async function connectToWebSocket(
-  options: ListenOptions,
-): Promise<WebSocket> {
+export function connectToWebSocket(
+  options: ConnectorOptions,
+): WebSocket {
   const { hostname, port } = options;
   const url = `ws://${hostname}:${port}`;
   return new WebSocket(url);

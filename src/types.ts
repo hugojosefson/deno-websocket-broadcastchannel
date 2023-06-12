@@ -1,14 +1,19 @@
-export interface ListenOptions {
+export interface ConnectorOptions {
   hostname: string;
   port: number;
 }
 
-export const DEFAULT_LISTEN_OPTIONS: ListenOptions = {
+export const DEFAULT_CONNECTOR_OPTIONS: ConnectorOptions = {
   port: 49152,
   hostname: "localhost",
 };
 
-export type Being = (listenOptions: ListenOptions) => Promise<BeingResult>;
-export type BeingResult = "retry" | "try_next" | "stop";
+export type Connector<T> = (
+  listenOptions: ConnectorOptions,
+  onmessage: OnMessage<T>,
+  messageGenerator: EventTarget,
+  abortSignal: AbortSignal,
+) => Promise<ConnectorResult>;
+export type ConnectorResult = "retry" | "try_next" | "stop";
 
 export type OnMessage<T> = (message: T) => void;

@@ -1,4 +1,4 @@
-import { BeingResult, ListenOptions, OnMessage } from "./types.ts";
+import { ConnectorOptions, ConnectorResult, OnMessage } from "./types.ts";
 import { Logger, logger } from "./log.ts";
 
 const log0: Logger = logger(import.meta.url);
@@ -6,12 +6,12 @@ const log0: Logger = logger(import.meta.url);
 // TODO: server: keep track of all clients.
 // TODO: server: re-send messages to all clients, except to the one that sent it.
 
-export async function beServer(
-  options: ListenOptions,
+export async function beServer<T>(
+  options: ConnectorOptions,
   onmessage: OnMessage<T>,
   messageGenerator: EventTarget,
   abortSignal: AbortSignal,
-): Promise<BeingResult> {
+): Promise<ConnectorResult> {
   const log: Logger = log0.sub(beServer.name);
   const { hostname, port } = options;
   const clients: WebSocket[] = [];
@@ -59,12 +59,15 @@ async function handleHttp<T>(
       const { socket, response } = Deno.upgradeWebSocket(request);
       const log = log1.sub("webSocket");
 
-      function socketCloser() {
+      const socketCloser = () => {
         socket.close();
-      }
-      function messageListener(e: MessageEvent) {
+      };
+      const messageListener = (e: Event) => {
+        if (!(e instanceof MessageEvent)) {
+          return;
+        }
         socket.send(e.data);
-      }
+      };
 
       socket.onopen = () => {
         log.sub("onopen")("socket is open.");
