@@ -4,7 +4,7 @@
 import { Logger, logger } from "./log.ts";
 import { beServer } from "./connector/server.ts";
 import { beClient } from "./connector/client.ts";
-import { alternatingLoop } from "./alternating-loop.ts";
+import { alternatingLoop } from "./connector/alternating-loop.ts";
 import {
   ConnectorOptions,
   DEFAULT_CONNECTOR_OPTIONS,
