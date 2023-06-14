@@ -3,7 +3,7 @@ import { Logger, logger } from "../log.ts";
 import { Connector, ConnectorResult, MessageT } from "./mod.ts";
 
 const log: Logger = logger(import.meta.url);
-export class AlternatingLoop<T extends MessageT>
+export class LoopingConnector<T extends MessageT>
   implements Connector<T>, Iterator<Connector<T>> {
   private connectorIndex = 0;
   constructor(

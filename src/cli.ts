@@ -4,7 +4,7 @@
 import { Logger, logger } from "./log.ts";
 import { Server } from "./connector/server.ts";
 import { Client } from "./connector/client.ts";
-import { AlternatingLoop } from "./connector/alternating-loop.ts";
+import { LoopingConnector } from "./connector/looping-connector.ts";
 import {
   ConnectorResult,
   MessageListener,
@@ -16,14 +16,12 @@ const log0: Logger = logger(import.meta.url);
 async function main() {
   const log: Logger = log0.sub(main.name);
 
-  const incoming: MessageListener<string> = log
-    .sub("alternatingLoop")
-    .sub("onmessage");
+  const incoming: MessageListener<string> = log.sub("incoming");
   const outgoing: MessageSender<string> = new MessageSender<string>();
   const aborter: AbortController = new AbortController();
 
-  log("starting alternating loop");
-  const resultPromise: Promise<ConnectorResult> = new AlternatingLoop(
+  log("starting looping connector");
+  const resultPromise: Promise<ConnectorResult> = new LoopingConnector(
     [
       new Server(incoming, outgoing, aborter.signal),
       new Client(incoming, outgoing, aborter.signal),
@@ -42,9 +40,9 @@ async function main() {
   log("stdin closed, aborting");
   aborter.abort();
 
-  log("waiting for alternating loop to end");
+  log("waiting for looping connector to end");
   const result = await resultPromise;
-  log("alternating loop ended: ", result);
+  log("looping connector ended: ", result);
 }
 
 if (import.meta.main) {
