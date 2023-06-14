@@ -72,7 +72,6 @@ export class Server<T extends MessageT> extends BaseConnector<T> {
         client.onopen = () => {
           log.sub("onopen")("socket is open.");
           this.clients.add(client);
-          client.send(`Hello from ${Deno.pid}.`);
           this.abortSignal.addEventListener("abort", clientCloser);
           this.outgoing.addMessageListener(messageListener);
         };

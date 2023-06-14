@@ -25,7 +25,7 @@ export class Client<T extends MessageT> extends BaseConnector<T> {
     const socket: WebSocket = new WebSocket(this.websocketUrl);
 
     function messageListener(message: T) {
-      log1.sub("messageListener")("you typed:", message);
+      log1.sub("messageListener")("you send:", message);
       socket.send(message);
     }
 
