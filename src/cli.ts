@@ -22,22 +22,14 @@ async function main() {
         log.sub("alternatingLoop").sub("onmessage"),
         outgoing,
         aborter.signal,
-        0xCA57,
-        "localhost",
       ),
       new Client(
         log.sub("alternatingLoop").sub("onmessage"),
         outgoing,
         aborter.signal,
-        0xCA57,
-        "localhost",
       ),
     ],
-    log.sub("alternatingLoop").sub("onmessage"),
-    outgoing,
     aborter.signal,
-    0xCA57,
-    "localhost",
   ).run();
 
   log("continuously reading from stdin");

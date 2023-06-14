@@ -1,27 +1,15 @@
 import { DEFAULT_SLEEP_DURATION_MS, sleep } from "../fn.ts";
 import { Logger, logger } from "../log.ts";
-import {
-  Connector,
-  ConnectorResult,
-  MessageListener,
-  MessageSender,
-  MessageT,
-} from "./mod.ts";
+import { Connector, ConnectorResult, MessageT } from "./mod.ts";
 
 const log: Logger = logger(import.meta.url);
-export class AlternatingLoop<T extends MessageT> extends Connector<T>
-  implements Iterator<Connector<T>> {
+export class AlternatingLoop<T extends MessageT>
+  implements Connector<T>, Iterator<Connector<T>> {
   private connectorIndex = 0;
   constructor(
     private readonly connectors: Connector<T>[],
-    incoming: MessageListener<T>,
-    outgoing: MessageSender<T>,
-    abortSignal: AbortSignal,
-    port: number,
-    hostname: string,
-  ) {
-    super(incoming, outgoing, abortSignal, port, hostname);
-  }
+    private readonly abortSignal: AbortSignal,
+  ) {}
   async run(): Promise<ConnectorResult> {
     let result: ConnectorResult = "stop";
     for (const connector of this) {

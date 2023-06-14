@@ -27,15 +27,21 @@ export class MessageSender<T extends MessageT> {
   }
 }
 
-export abstract class Connector<T extends MessageT> {
+export interface Connector<T extends MessageT> {
+  run(): Promise<ConnectorResult>;
+}
+
+export const DEFAULT_PORT = 0xCA57;
+export const DEFAULT_HOSTNAME = "localhost";
+
+export abstract class BaseConnector<T extends MessageT> {
   protected constructor(
     protected readonly incoming: MessageListener<T>,
     protected readonly outgoing: MessageSender<T>,
     protected readonly abortSignal: AbortSignal,
-    protected readonly port: number,
-    protected readonly hostname: string,
+    protected readonly port: number = DEFAULT_PORT,
+    protected readonly hostname: string = DEFAULT_HOSTNAME,
   ) {}
-  abstract run(): Promise<ConnectorResult>;
 }
 
 export type MessageT = string | ArrayBufferLike | Blob | ArrayBufferView;

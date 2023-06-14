@@ -1,7 +1,9 @@
 import { Logger, logger } from "../log.ts";
 import {
-  Connector,
+  BaseConnector,
   ConnectorResult,
+  DEFAULT_HOSTNAME,
+  DEFAULT_PORT,
   MessageListener,
   MessageSender,
   MessageT,
@@ -9,13 +11,13 @@ import {
 
 const log0: Logger = logger(import.meta.url);
 
-export class Client<T extends MessageT> extends Connector<T> {
+export class Client<T extends MessageT> extends BaseConnector<T> {
   constructor(
     incoming: MessageListener<T>,
     outgoing: MessageSender<T>,
     abortSignal: AbortSignal,
-    port: number,
-    hostname: string,
+    port: number = DEFAULT_PORT,
+    hostname: string = DEFAULT_HOSTNAME,
   ) {
     super(incoming, outgoing, abortSignal, port, hostname);
   }
