@@ -31,6 +31,7 @@ export interface Connector<T extends MessageT> {
   run(): Promise<ConnectorResult>;
 }
 
+// TODO: use ws url instead. default to ws://localhost:51799 (0xCA57, CAST)
 export const DEFAULT_PORT = 0xCA57;
 export const DEFAULT_HOSTNAME = "localhost";
 
