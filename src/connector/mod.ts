@@ -31,17 +31,14 @@ export interface Connector<T extends MessageT> {
   run(): Promise<ConnectorResult>;
 }
 
-// TODO: use ws url instead. default to ws://localhost:51799 (0xCA57, CAST)
-export const DEFAULT_PORT = 0xCA57;
-export const DEFAULT_HOSTNAME = "localhost";
+export const DEFAULT_WEBSOCKET_URL = new URL("ws://localhost:51799");
 
 export abstract class BaseConnector<T extends MessageT> {
   protected constructor(
     protected readonly incoming: MessageListener<T>,
     protected readonly outgoing: MessageSender<T>,
     protected readonly abortSignal: AbortSignal,
-    protected readonly port: number = DEFAULT_PORT,
-    protected readonly hostname: string = DEFAULT_HOSTNAME,
+    protected readonly websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {}
 }
 

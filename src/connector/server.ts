@@ -2,13 +2,12 @@ import { Logger, logger } from "../log.ts";
 import {
   BaseConnector,
   ConnectorResult,
-  DEFAULT_HOSTNAME,
-  DEFAULT_PORT,
+  DEFAULT_WEBSOCKET_URL,
   MessageListener,
   MessageSender,
   MessageT,
 } from "./mod.ts";
-import { isNot } from "../fn.ts";
+import { getPortNumber, isNot } from "../fn.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -18,23 +17,25 @@ export class Server<T extends MessageT> extends BaseConnector<T> {
     incoming: MessageListener<T>,
     outgoing: MessageSender<T>,
     abortSignal: AbortSignal,
-    port: number = DEFAULT_PORT,
-    hostname: string = DEFAULT_HOSTNAME,
+    websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {
-    super(incoming, outgoing, abortSignal, port, hostname);
+    super(incoming, outgoing, abortSignal, websocketUrl);
   }
 
   async run(): Promise<ConnectorResult> {
     const log: Logger = log0.sub(Server.name);
-    const { hostname, port, abortSignal } = this;
-    log(`Becoming the server at ${hostname}:${port}...`);
+    const { websocketUrl, abortSignal } = this;
+    log(`Becoming the server at ${websocketUrl}...`);
 
     let listener: Deno.Listener | undefined = undefined;
     const listenerCloser = () => listener?.close();
     abortSignal.addEventListener("abort", listenerCloser);
     try {
-      listener = Deno.listen({ port, hostname });
-      log(`Became the server at ${hostname}:${port}.`);
+      listener = Deno.listen({
+        port: getPortNumber(this.websocketUrl),
+        hostname: this.websocketUrl.hostname,
+      });
+      log(`Became the server at ${websocketUrl}.`);
       for await (const conn of listener) {
         void this.handleHttp(conn);
       }
@@ -49,7 +50,7 @@ export class Server<T extends MessageT> extends BaseConnector<T> {
         throw e;
       }
     } finally {
-      log(`No longer the server at ${hostname}:${port}.`);
+      log(`No longer the server at ${websocketUrl}.`);
       abortSignal.removeEventListener("abort", listenerCloser);
     }
     return abortSignal.aborted ? "stop" : "retry";

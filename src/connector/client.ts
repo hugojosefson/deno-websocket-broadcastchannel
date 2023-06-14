@@ -2,8 +2,7 @@ import { Logger, logger } from "../log.ts";
 import {
   BaseConnector,
   ConnectorResult,
-  DEFAULT_HOSTNAME,
-  DEFAULT_PORT,
+  DEFAULT_WEBSOCKET_URL,
   MessageListener,
   MessageSender,
   MessageT,
@@ -16,17 +15,14 @@ export class Client<T extends MessageT> extends BaseConnector<T> {
     incoming: MessageListener<T>,
     outgoing: MessageSender<T>,
     abortSignal: AbortSignal,
-    port: number = DEFAULT_PORT,
-    hostname: string = DEFAULT_HOSTNAME,
+    websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {
-    super(incoming, outgoing, abortSignal, port, hostname);
+    super(incoming, outgoing, abortSignal, websocketUrl);
   }
 
   async run(): Promise<ConnectorResult> {
     const log1: Logger = log0.sub(Client.name);
-    const socket: WebSocket = new WebSocket(
-      `ws://${this.hostname}:${this.port}`,
-    );
+    const socket: WebSocket = new WebSocket(this.websocketUrl);
 
     function messageListener(message: T) {
       log1.sub("messageListener")("you typed:", message);

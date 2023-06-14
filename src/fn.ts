@@ -45,3 +45,25 @@ export async function sleep(
 export function isNot<T>(value: T): (other: T) => boolean {
   return (other: T): boolean => other !== value;
 }
+
+/**
+ * Extracts the port number from a URL.
+ * Responds correctly to the default port for a given protocol.
+ * @param url
+ */
+export function getPortNumber(url: URL): number {
+  const asNumber = parseInt(url.port);
+  if (!isNaN(asNumber)) {
+    return asNumber;
+  }
+  switch (url.protocol) {
+    case "http:":
+    case "ws:":
+      return 80;
+    case "https:":
+    case "wss:":
+      return 443;
+    default:
+      throw new Error(`Unknown protocol: ${url.protocol}`);
+  }
+}
