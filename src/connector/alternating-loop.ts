@@ -1,40 +1,60 @@
 import { DEFAULT_SLEEP_DURATION_MS, sleep } from "../fn.ts";
-import { logger } from "../log.ts";
+import { Logger, logger } from "../log.ts";
 import {
   Connector,
-  ConnectorOptions,
   ConnectorResult,
-  OnMessage,
+  MessageListener,
+  MessageSender,
+  MessageT,
 } from "./mod.ts";
 
-const log = logger(import.meta.url);
-export async function alternatingLoop<T>(
-  options: ConnectorOptions,
-  connectors: Connector<T>[],
-  onmessage: OnMessage<T>,
-  messageGenerator: EventTarget,
-  abortSignal: AbortSignal,
-): Promise<ConnectorResult> {
-  let i = 0;
-  while (true) {
-    const connector: Connector<T> = connectors[i];
-    let result: ConnectorResult;
-    do {
-      result = await connector(
-        options,
-        onmessage,
-        messageGenerator,
-        abortSignal,
-      );
-      log("result", result);
-      await sleep(DEFAULT_SLEEP_DURATION_MS, log);
-    } while (result === "retry");
+const log: Logger = logger(import.meta.url);
+export class AlternatingLoop<T extends MessageT> extends Connector<T>
+  implements Iterator<Connector<T>> {
+  private connectorIndex = 0;
+  constructor(
+    private readonly connectors: Connector<T>[],
+    incoming: MessageListener<T>,
+    outgoing: MessageSender<T>,
+    abortSignal: AbortSignal,
+    port: number,
+    hostname: string,
+  ) {
+    super(incoming, outgoing, abortSignal, port, hostname);
+  }
+  async run(): Promise<ConnectorResult> {
+    let result: ConnectorResult = "stop";
+    for (const connector of this) {
+      do {
+        result = await connector.run();
+        log("result", result);
+        if (this.abortSignal.aborted) {
+          return "stop";
+        }
+        await sleep(DEFAULT_SLEEP_DURATION_MS, log);
+      } while (result === "retry");
 
-    if (result === "try_next") {
-      i = (i + 1) % connectors.length;
-      continue;
+      if (result === "try_next") {
+        continue;
+      }
+
+      return result;
     }
-
     return result;
+  }
+  [Symbol.iterator](): Iterator<Connector<T>> {
+    return this;
+  }
+  next(): IteratorResult<Connector<T>> {
+    if (this.connectors.length === 0) {
+      return { done: true, value: undefined };
+    }
+    this.connectorIndex %= this.connectors.length;
+    const connector: Connector<T> = this.connectors[this.connectorIndex];
+    this.connectorIndex++;
+    return {
+      done: false,
+      value: connector,
+    };
   }
 }

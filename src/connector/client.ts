@@ -1,67 +1,75 @@
 import { Logger, logger } from "../log.ts";
-import { ConnectorOptions, ConnectorResult, OnMessage } from "./mod.ts";
+import {
+  Connector,
+  ConnectorResult,
+  MessageListener,
+  MessageSender,
+  MessageT,
+} from "./mod.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export async function beClient<T>(
-  options: ConnectorOptions,
-  onmessage: OnMessage<T>,
-  messageGenerator: EventTarget,
-  abortSignal: AbortSignal,
-): Promise<ConnectorResult> {
-  const log1: Logger = log0.sub(beClient.name);
-  const socket: WebSocket = connectToWebSocket(options);
-  function messageListener(e: Event) {
-    if (!(e instanceof MessageEvent)) {
-      return;
-    }
-    log1.sub("messageListener")("you typed:", e.data);
-    socket.send(e.data);
+export class Client<T extends MessageT> extends Connector<T> {
+  constructor(
+    incoming: MessageListener<T>,
+    outgoing: MessageSender<T>,
+    abortSignal: AbortSignal,
+    port: number,
+    hostname: string,
+  ) {
+    super(incoming, outgoing, abortSignal, port, hostname);
   }
-  function socketCloser() {
-    log1.sub("socketCloser")("closing socket...");
-    socket.close();
-  }
-  abortSignal.addEventListener("abort", socketCloser);
-  socket.addEventListener("open", () => {
-    log1.sub("socket.onopen")("socket is open.");
-    messageGenerator.addEventListener("message", messageListener);
-  });
-  socket.addEventListener("message", (e: MessageEvent) => {
-    log1.sub("socket.onmessage")("server says:", e.data);
-    onmessage(e.data);
-  });
-  return await new Promise((resolve, reject) => {
-    socket.addEventListener("close", () => {
-      const log = log1.sub("onclose");
-      messageGenerator.removeEventListener("message", messageListener);
-      const result: ConnectorResult = abortSignal.aborted ? "stop" : "try_next";
-      log(result);
-      resolve(result);
-    });
-    socket.addEventListener("error", (e: Event) => {
-      const log = log1.sub("onerror");
-      if (e instanceof ErrorEvent && e?.message === "unexpected eof") {
-        log("webSocket lost connection to server.");
-      } else {
-        log("Unexpected error from webSocket:", e);
-        reject(e);
-      }
-      messageGenerator.removeEventListener("message", messageListener);
-      const result: ConnectorResult = abortSignal.aborted ? "stop" : "try_next";
-      log(result);
-      resolve(result);
-    });
-  });
-}
 
-/**
- * Connect as a client, to a WebSocket server.
- */
-export function connectToWebSocket(
-  options: ConnectorOptions,
-): WebSocket {
-  const { hostname, port } = options;
-  const url = `ws://${hostname}:${port}`;
-  return new WebSocket(url);
+  async run(): Promise<ConnectorResult> {
+    const log1: Logger = log0.sub(Client.name);
+    const socket: WebSocket = new WebSocket(
+      `ws://${this.hostname}:${this.port}`,
+    );
+
+    function messageListener(message: T) {
+      log1.sub("messageListener")("you typed:", message);
+      socket.send(message);
+    }
+
+    function socketCloser() {
+      log1.sub("socketCloser")("closing socket...");
+      socket.close();
+    }
+
+    this.abortSignal.addEventListener("abort", socketCloser);
+    socket.addEventListener("open", () => {
+      log1.sub("socket.onopen")("socket is open.");
+      this.outgoing.addMessageListener(messageListener);
+    });
+    socket.addEventListener("message", (e: MessageEvent) => {
+      log1.sub("socket.onmessage")("server says:", e.data);
+      this.incoming(e.data);
+    });
+    return await new Promise((resolve, reject) => {
+      socket.addEventListener("close", () => {
+        const log = log1.sub("onclose");
+        this.outgoing.removeMessageListener(messageListener);
+        const result: ConnectorResult = this.abortSignal.aborted
+          ? "stop"
+          : "try_next";
+        log(result);
+        resolve(result);
+      });
+      socket.addEventListener("error", (e: Event) => {
+        const log = log1.sub("onerror");
+        if (e instanceof ErrorEvent && e?.message === "unexpected eof") {
+          log("webSocket lost connection to server.");
+        } else {
+          log("Unexpected error from webSocket:", e);
+          reject(e);
+        }
+        this.outgoing.removeMessageListener(messageListener);
+        const result: ConnectorResult = this.abortSignal.aborted
+          ? "stop"
+          : "try_next";
+        log(result);
+        resolve(result);
+      });
+    });
+  }
 }

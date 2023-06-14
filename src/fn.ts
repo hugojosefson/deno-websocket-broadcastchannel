@@ -41,3 +41,7 @@ export async function sleep(
   log(`sleep(${ms}ms)...`);
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+export function isNot<T>(value: T): (other: T) => boolean {
+  return (other: T): boolean => other !== value;
+}
