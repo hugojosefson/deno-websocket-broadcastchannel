@@ -5,29 +5,28 @@ import { Logger, logger } from "./log.ts";
 import { Server } from "./connector/server.ts";
 import { Client } from "./connector/client.ts";
 import { AlternatingLoop } from "./connector/alternating-loop.ts";
-import { ConnectorResult, MessageSender } from "./connector/mod.ts";
+import {
+  ConnectorResult,
+  MessageListener,
+  MessageSender,
+} from "./connector/mod.ts";
 
 const log0: Logger = logger(import.meta.url);
 
 async function main() {
   const log: Logger = log0.sub(main.name);
 
+  const incoming: MessageListener<string> = log
+    .sub("alternatingLoop")
+    .sub("onmessage");
   const outgoing: MessageSender<string> = new MessageSender<string>();
   const aborter: AbortController = new AbortController();
 
   log("starting alternating loop");
   const resultPromise: Promise<ConnectorResult> = new AlternatingLoop(
     [
-      new Server(
-        log.sub("alternatingLoop").sub("onmessage"),
-        outgoing,
-        aborter.signal,
-      ),
-      new Client(
-        log.sub("alternatingLoop").sub("onmessage"),
-        outgoing,
-        aborter.signal,
-      ),
+      new Server(incoming, outgoing, aborter.signal),
+      new Client(incoming, outgoing, aborter.signal),
     ],
     aborter.signal,
   ).run();
