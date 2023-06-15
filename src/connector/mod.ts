@@ -33,13 +33,15 @@ export interface Connector<T extends MessageT> {
 
 export const DEFAULT_WEBSOCKET_URL = new URL("ws://localhost:51799");
 
-export abstract class BaseConnector<T extends MessageT> {
+export abstract class BaseConnector<T extends MessageT>
+  implements Connector<T> {
   protected constructor(
     protected readonly incoming: MessageListener<T>,
     protected readonly outgoing: MessageSender<T>,
     protected readonly abortSignal: AbortSignal,
     protected readonly websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {}
+  abstract run(): Promise<ConnectorResult>;
 }
 
 export type MessageT = string | ArrayBufferLike | Blob | ArrayBufferView;
