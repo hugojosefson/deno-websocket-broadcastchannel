@@ -28,16 +28,18 @@ export class MessageSender {
   }
 }
 
-export interface Connector extends EventTarget {
+export interface Connector extends EventTarget, Deno.Closer {
   run(): Promise<void>;
-  close(): void;
 }
 
-export const DEFAULT_WEBSOCKET_URL = new URL("ws://localhost:51799");
-
-export abstract class BaseConnector extends EventTarget implements Connector {
+export abstract class ClosableEventTarget extends EventTarget
+  implements Deno.Closer {
   protected closed = false;
-  abstract run(): Promise<void>;
+  protected readonly name: string;
+  protected constructor(name?: string) {
+    super();
+    this.name = name ?? this.constructor.name;
+  }
   close() {
     this.closed = true;
     this.dispatchEvent(new Event("close"));
@@ -45,25 +47,26 @@ export abstract class BaseConnector extends EventTarget implements Connector {
   protected assertNotClosed() {
     if (this.closed) {
       throw new Error(
-        `${this.constructor.name} is closed`,
+        `${this.name} is closed`,
       );
     }
   }
 }
 
-export abstract class BaseConnectorWithUrl extends EventTarget
+export const DEFAULT_WEBSOCKET_URL = new URL("ws://localhost:51799");
+
+export abstract class BaseConnector extends ClosableEventTarget
   implements Connector {
-  protected closed = false;
+  abstract run(): Promise<void>;
+}
+
+export abstract class BaseConnectorWithUrl extends BaseConnector {
   protected constructor(
     protected readonly incoming: MessageListener,
     protected readonly outgoing: MessageSender,
     protected readonly websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {
-    super();
+    super(`${BaseConnectorWithUrl.name}(${websocketUrl})`);
   }
   abstract run(): Promise<void>;
-  close() {
-    this.closed = true;
-    this.dispatchEvent(new Event("close"));
-  }
 }

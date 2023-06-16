@@ -47,20 +47,20 @@ export class Server extends BaseConnectorWithUrl {
       }
     } finally {
       log(`No longer the server at ${websocketUrl}.`);
-      this.removeEventListener("close", listenerCloser);
     }
   }
 
   private async handleHttp(conn: Deno.Conn): Promise<void> {
     const log1: Logger = log0.sub(this.handleHttp.name);
-    const closer = () => conn.close();
-    this.addEventListener("close", closer);
+    const connCloser = () => conn.close();
+    this.addEventListener("close", connCloser);
     try {
       for await (const requestEvent of Deno.serveHttp(conn)) {
         if (requestEvent) {
           const { request }: Deno.RequestEvent = requestEvent;
           const { socket: client, response }: Deno.WebSocketUpgrade = Deno
             .upgradeWebSocket(request);
+          const clientCloser = () => client.close();
           const log: Logger = log1.sub("webSocket");
 
           const messageListener: MessageListener = (message: string) =>
@@ -68,6 +68,7 @@ export class Server extends BaseConnectorWithUrl {
 
           client.onopen = () => {
             log.sub("onopen")("socket is open.");
+            this.addEventListener("close", clientCloser);
             this.clients.add(client);
             this.outgoing.addMessageListener(messageListener);
           };
@@ -79,6 +80,7 @@ export class Server extends BaseConnectorWithUrl {
           };
           client.onclose = () => {
             log.sub("onclose")("");
+            this.removeEventListener("close", clientCloser);
             this.clients.delete(client);
             this.outgoing.removeMessageListener(messageListener);
           };
@@ -92,7 +94,7 @@ export class Server extends BaseConnectorWithUrl {
         }
       }
     } finally {
-      this.removeEventListener("close", closer);
+      this.removeEventListener("close", connCloser);
     }
   }
 }
