@@ -9,6 +9,12 @@ import { Server } from "./connector/server.ts";
 import { Client } from "./connector/client.ts";
 
 let connector: Connector<MessageT> | undefined = undefined;
+const incoming: MessageListener<MessageT> = function incoming(
+  _message: MessageT,
+) {
+  // TODO: Handle incoming messages.
+};
+const outgoing: MessageSender<MessageT> = new MessageSender<MessageT>();
 
 function ensureConnector() {
   if (connector === undefined) {
@@ -27,6 +33,7 @@ function getConnector(): Connector<MessageT> {
 function possiblyUnregisterConnector() {
   if (connector !== undefined) {
     if (channelSets.size === 0) {
+      connector.close();
       connector = undefined;
     }
   }
@@ -78,12 +85,6 @@ function _foreachChannelDo(
   }
 }
 
-const incoming: MessageListener<MessageT> = function incoming(
-  _message: MessageT,
-) {
-  // TODO: Handle incoming messages.
-};
-const outgoing: MessageSender<MessageT> = new MessageSender<MessageT>();
 
 export class WebSocketBroadcastChannel<T extends MessageT> extends EventTarget {
   readonly name: string;
