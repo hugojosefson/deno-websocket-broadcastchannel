@@ -27,21 +27,38 @@ export class MessageSender<T extends MessageT> {
   }
 }
 
-export interface Connector<T extends MessageT> {
+export interface Connector<T extends MessageT> extends EventTarget {
   run(): Promise<ConnectorResult>;
+  close(): void;
 }
 
 export const DEFAULT_WEBSOCKET_URL = new URL("ws://localhost:51799");
 
-export abstract class BaseConnector<T extends MessageT>
+export abstract class BaseConnector<T extends MessageT> extends EventTarget
   implements Connector<T> {
+  protected closed = false;
+  abstract run(): Promise<ConnectorResult>;
+  close() {
+    this.closed = true;
+  }
+}
+
+export abstract class BaseConnectorWithUrl<T extends MessageT>
+  extends EventTarget
+  implements Connector<T> {
+  protected closed = false;
   protected constructor(
     protected readonly incoming: MessageListener<T>,
     protected readonly outgoing: MessageSender<T>,
-    protected readonly abortSignal: AbortSignal,
     protected readonly websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
-  ) {}
+  ) {
+    super();
+  }
   abstract run(): Promise<ConnectorResult>;
+  close() {
+    this.closed = true;
+    this.dispatchEvent(new Event("close"));
+  }
 }
 
 export type MessageT = string | ArrayBufferLike | Blob | ArrayBufferView;

@@ -67,3 +67,29 @@ export function getPortNumber(url: URL): number {
       throw new Error(`Unknown protocol: ${url.protocol}`);
   }
 }
+
+/**
+ * Creates an iterator that loops over the given items, over and over again.
+ * @param items
+ */
+export function loopingIterator<T>(items: T[]): IterableIterator<T> {
+  let index = 0;
+  const iterator = {
+    [Symbol.iterator](): IterableIterator<T> {
+      return iterator;
+    },
+    next(): IteratorResult<T> {
+      if (items.length === 0) {
+        return { done: true, value: undefined };
+      }
+      index %= items.length;
+      const item: T = items[index];
+      index++;
+      return {
+        done: false,
+        value: item,
+      };
+    },
+  };
+  return iterator;
+}

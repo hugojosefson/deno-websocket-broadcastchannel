@@ -6,6 +6,7 @@ import { Server } from "./connector/server.ts";
 import { Client } from "./connector/client.ts";
 import { LoopingConnector } from "./connector/looping-connector.ts";
 import {
+  Connector,
   ConnectorResult,
   MessageListener,
   MessageSender,
@@ -18,16 +19,15 @@ async function main() {
 
   const incoming: MessageListener<string> = log.sub("incoming");
   const outgoing: MessageSender<string> = new MessageSender<string>();
-  const aborter: AbortController = new AbortController();
 
   log("starting looping connector");
-  const resultPromise: Promise<ConnectorResult> = new LoopingConnector(
+  const connector: Connector<string> = new LoopingConnector(
     [
-      new Server(incoming, outgoing, aborter.signal),
-      new Client(incoming, outgoing, aborter.signal),
+      new Server(incoming, outgoing),
+      new Client(incoming, outgoing),
     ],
-    aborter.signal,
-  ).run();
+  );
+  const resultPromise: Promise<ConnectorResult> = connector.run();
 
   log("continuously reading from stdin");
   const decoder = new TextDecoder();
@@ -37,8 +37,8 @@ async function main() {
     outgoing.send(text);
   }
 
-  log("stdin closed, aborting");
-  aborter.abort();
+  log("stdin closed, closing connector");
+  connector.close();
 
   log("waiting for looping connector to end");
   const result = await resultPromise;
