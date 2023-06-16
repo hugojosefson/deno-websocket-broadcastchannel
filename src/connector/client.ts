@@ -4,12 +4,13 @@ import {
   DEFAULT_WEBSOCKET_URL,
   MessageListener,
   MessageSender,
-  MessageT,
+  StructuredClonable,
 } from "./mod.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export class Client<T extends MessageT> extends BaseConnectorWithUrl<T> {
+export class Client<T extends StructuredClonable>
+  extends BaseConnectorWithUrl<T> {
   constructor(
     incoming: MessageListener<T>,
     outgoing: MessageSender<T>,

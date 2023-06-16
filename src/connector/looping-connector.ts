@@ -1,9 +1,10 @@
 import { DEFAULT_SLEEP_DURATION_MS, loopingIterator, sleep } from "../fn.ts";
 import { Logger, logger } from "../log.ts";
-import { BaseConnector, Connector, MessageT } from "./mod.ts";
+import { BaseConnector, Connector, StructuredClonable } from "./mod.ts";
 
 const log: Logger = logger(import.meta.url);
-export class LoopingConnector<T extends MessageT> extends BaseConnector<T>
+export class LoopingConnector<T extends StructuredClonable>
+  extends BaseConnector<T>
   implements Connector<T> {
   private readonly connectors: Iterable<Connector<T>>;
   constructor(

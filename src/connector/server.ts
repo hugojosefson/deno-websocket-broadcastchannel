@@ -4,13 +4,14 @@ import {
   DEFAULT_WEBSOCKET_URL,
   MessageListener,
   MessageSender,
-  MessageT,
+  StructuredClonable,
 } from "./mod.ts";
 import { getPortNumber, isNot } from "../fn.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export class Server<T extends MessageT> extends BaseConnectorWithUrl<T> {
+export class Server<T extends StructuredClonable>
+  extends BaseConnectorWithUrl<T> {
   private readonly clients: Set<WebSocket> = new Set();
   constructor(
     incoming: MessageListener<T>,

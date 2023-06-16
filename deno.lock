@@ -25,6 +25,7 @@
     "https://deno.land/x/debug@0.2.0/deps.ts": "c00793c24e4d0a15c796c7ef3b9a9a3ac4ea06cad9ef7c68bcb538310e262ea0",
     "https://deno.land/x/debug@0.2.0/format.ts": "e5c81071cdb2e529b2dc3aa379428217a49af45bf59b6511812e2bba9023f1bc",
     "https://deno.land/x/debug@0.2.0/mod.ts": "32e961550c7358a88a9bb2606ac70eeb168305298f5ae1e9536018d8f0c54118",
+    "https://deno.land/x/oak@v12.5.0/structured_clone.ts": "c3888b14d1eec558345bfbf13d0993d59bd45aaa8588444e35dd558c3a921cd8",
     "https://deno.land/x/quiet_debug@v1.0.0/mod.ts": "4f21865c4b4f5ec27f8a4c5fb620b24401b76590688d7fe34bc5f862d0c4a335",
     "https://deno.land/x/semver@v1.4.1/mod.ts": "0b79c87562eb8a1f008ab0d98f8bb60076dd65bc06f1f8fdfac2d2dab162c27b"
   }

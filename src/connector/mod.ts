@@ -1,5 +1,10 @@
-export type MessageListener<T extends MessageT> = (message: T) => void;
-export class MessageSender<T extends MessageT> {
+export type { StructuredClonable } from "https://deno.land/x/oak@v12.5.0/structured_clone.ts";
+import type { StructuredClonable } from "https://deno.land/x/oak@v12.5.0/structured_clone.ts";
+
+export type MessageListener<T extends StructuredClonable> = (
+  message: T,
+) => void;
+export class MessageSender<T extends StructuredClonable> {
   private readonly target: EventTarget = new EventTarget();
   private readonly messageListeners: Set<MessageListener<T>> = new Set();
   private readonly eventListener = (e: Event) => {
@@ -26,14 +31,15 @@ export class MessageSender<T extends MessageT> {
   }
 }
 
-export interface Connector<T extends MessageT> extends EventTarget {
+export interface Connector<T extends StructuredClonable> extends EventTarget {
   run(): Promise<void>;
   close(): void;
 }
 
 export const DEFAULT_WEBSOCKET_URL = new URL("ws://localhost:51799");
 
-export abstract class BaseConnector<T extends MessageT> extends EventTarget
+export abstract class BaseConnector<T extends StructuredClonable>
+  extends EventTarget
   implements Connector<T> {
   protected closed = false;
   abstract run(): Promise<void>;
@@ -50,7 +56,7 @@ export abstract class BaseConnector<T extends MessageT> extends EventTarget
   }
 }
 
-export abstract class BaseConnectorWithUrl<T extends MessageT>
+export abstract class BaseConnectorWithUrl<T extends StructuredClonable>
   extends EventTarget
   implements Connector<T> {
   protected closed = false;
@@ -67,5 +73,3 @@ export abstract class BaseConnectorWithUrl<T extends MessageT>
     this.dispatchEvent(new Event("close"));
   }
 }
-
-export type MessageT = string | ArrayBufferLike | Blob | ArrayBufferView;
