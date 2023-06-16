@@ -1,3 +1,5 @@
+// TODO: use EventTarget instead of MessageListener, MessageSender
+
 export type MessageListener = (message: string) => void;
 export class MessageSender {
   private readonly target: EventTarget = new EventTarget();
