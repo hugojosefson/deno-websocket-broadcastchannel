@@ -4,18 +4,16 @@ import {
   DEFAULT_WEBSOCKET_URL,
   MessageListener,
   MessageSender,
-  StructuredClonable,
 } from "./mod.ts";
 import { getPortNumber, isNot } from "../fn.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export class Server<T extends StructuredClonable>
-  extends BaseConnectorWithUrl<T> {
+export class Server extends BaseConnectorWithUrl {
   private readonly clients: Set<WebSocket> = new Set();
   constructor(
-    incoming: MessageListener<T>,
-    outgoing: MessageSender<T>,
+    incoming: MessageListener,
+    outgoing: MessageSender,
     websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {
     super(incoming, outgoing, websocketUrl);
@@ -65,7 +63,7 @@ export class Server<T extends StructuredClonable>
             .upgradeWebSocket(request);
           const log: Logger = log1.sub("webSocket");
 
-          const messageListener: MessageListener<T> = (message: T) =>
+          const messageListener: MessageListener = (message: string) =>
             client.send(message);
 
           client.onopen = () => {

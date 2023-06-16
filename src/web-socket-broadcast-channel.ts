@@ -1,38 +1,31 @@
-import {
-  Connector,
-  MessageListener,
-  MessageSender,
-  StructuredClonable,
-} from "./connector/mod.ts";
+import { Connector, MessageListener, MessageSender } from "./connector/mod.ts";
 import { LoopingConnector } from "./connector/looping-connector.ts";
 import { Server } from "./connector/server.ts";
 import { Client } from "./connector/client.ts";
 
 type MultiplexMessage = {
   channel: string;
-  message: StructuredClonable;
+  message: string;
 };
 
-let connector: Connector<MultiplexMessage> | undefined = undefined;
-const incoming: MessageListener<MultiplexMessage> = function incoming(
-  _message: MultiplexMessage,
+let connector: Connector | undefined = undefined;
+const incoming: MessageListener = function incoming(
+  _message: string,
 ) {
   // TODO: Handle incoming messages.
 };
-const outgoing: MessageSender<MultiplexMessage> = new MessageSender<
-  MultiplexMessage
->();
+const outgoing: MessageSender = new MessageSender();
 
 function ensureConnector() {
   if (connector === undefined) {
-    connector = new LoopingConnector<MultiplexMessage>([
-      new Server<MultiplexMessage>(incoming, outgoing),
-      new Client<MultiplexMessage>(incoming, outgoing),
+    connector = new LoopingConnector([
+      new Server(incoming, outgoing),
+      new Client(incoming, outgoing),
     ]);
   }
 }
 
-function getConnector(): Connector<MultiplexMessage> {
+function getConnector(): Connector {
   ensureConnector();
   return connector!;
 }
@@ -46,34 +39,25 @@ function possiblyUnregisterConnector() {
   }
 }
 
-const channelSets: Map<
-  string,
-  Set<WebSocketBroadcastChannel<MultiplexMessage>>
-> = new Map();
+const channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
 
 function _registerChannel(
-  channel: WebSocketBroadcastChannel<MultiplexMessage>,
+  channel: WebSocketBroadcastChannel,
 ): void {
   ensureConnector();
   const { name } = channel;
   if (!channelSets.has(name)) {
     channelSets.set(name, new Set());
   }
-  const channelSet: Set<WebSocketBroadcastChannel<MultiplexMessage>> =
-    channelSets.get(
-      name,
-    )!;
+  const channelSet: Set<WebSocketBroadcastChannel> = channelSets.get(name)!;
   channelSet.add(channel);
 }
 
 function unregisterChannel(
-  channel: WebSocketBroadcastChannel<MultiplexMessage>,
+  channel: WebSocketBroadcastChannel,
 ): void {
   const { name } = channel;
-  const channelSet: Set<WebSocketBroadcastChannel<MultiplexMessage>> =
-    channelSets.get(
-      name,
-    )!;
+  const channelSet: Set<WebSocketBroadcastChannel> = channelSets.get(name)!;
   channelSet.delete(channel);
   if (channelSet.size === 0) {
     channelSets.delete(name);
@@ -83,7 +67,7 @@ function unregisterChannel(
 
 function getChannelSet(
   name: string,
-): Set<WebSocketBroadcastChannel<MultiplexMessage>> {
+): Set<WebSocketBroadcastChannel> {
   if (!channelSets.has(name)) {
     channelSets.set(name, new Set());
   }
@@ -92,19 +76,15 @@ function getChannelSet(
 
 function _foreachChannelDo(
   name: string,
-  callback: (channel: WebSocketBroadcastChannel<MultiplexMessage>) => void,
+  callback: (channel: WebSocketBroadcastChannel) => void,
 ): void {
-  const channelSet: Set<WebSocketBroadcastChannel<MultiplexMessage>> =
-    getChannelSet(
-      name,
-    );
+  const channelSet: Set<WebSocketBroadcastChannel> = getChannelSet(name);
   for (const channel of channelSet) {
     callback(channel);
   }
 }
 
-export class WebSocketBroadcastChannel<T extends MultiplexMessage>
-  extends EventTarget {
+export class WebSocketBroadcastChannel extends EventTarget {
   readonly name: string;
   private closed = false;
 
@@ -112,7 +92,7 @@ export class WebSocketBroadcastChannel<T extends MultiplexMessage>
     super();
     this.name = name;
   }
-  postMessage(message: T): void {
+  postMessage(message: string): void {
     this.assertNotClosed();
     getConnector().dispatchEvent(
       new MessageEvent("message", { data: message }),

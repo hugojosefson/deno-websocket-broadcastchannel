@@ -12,11 +12,11 @@ const log0: Logger = logger(import.meta.url);
 async function main() {
   const log: Logger = log0.sub(main.name);
 
-  const incoming: MessageListener<string> = log.sub("incoming");
-  const outgoing: MessageSender<string> = new MessageSender<string>();
+  const incoming: MessageListener = log.sub("incoming");
+  const outgoing: MessageSender = new MessageSender();
 
   log("starting looping connector");
-  const connector: Connector<string> = new LoopingConnector(
+  const connector: Connector = new LoopingConnector(
     [
       new Server(incoming, outgoing),
       new Client(incoming, outgoing),

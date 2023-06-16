@@ -4,16 +4,14 @@ import {
   DEFAULT_WEBSOCKET_URL,
   MessageListener,
   MessageSender,
-  StructuredClonable,
 } from "./mod.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export class Client<T extends StructuredClonable>
-  extends BaseConnectorWithUrl<T> {
+export class Client extends BaseConnectorWithUrl {
   constructor(
-    incoming: MessageListener<T>,
-    outgoing: MessageSender<T>,
+    incoming: MessageListener,
+    outgoing: MessageSender,
     websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {
     super(incoming, outgoing, websocketUrl);
@@ -23,7 +21,7 @@ export class Client<T extends StructuredClonable>
     const log1: Logger = log0.sub(Client.name);
     const socket: WebSocket = new WebSocket(this.websocketUrl);
 
-    function messageListener(message: T) {
+    function messageListener(message: string) {
       log1.sub("messageListener")("you send:", message);
       socket.send(message);
     }
