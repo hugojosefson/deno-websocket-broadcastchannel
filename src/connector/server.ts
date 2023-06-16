@@ -1,7 +1,6 @@
 import { Logger, logger } from "../log.ts";
 import {
   BaseConnectorWithUrl,
-  ConnectorResult,
   DEFAULT_WEBSOCKET_URL,
   MessageListener,
   MessageSender,
@@ -21,7 +20,7 @@ export class Server<T extends MessageT> extends BaseConnectorWithUrl<T> {
     super(incoming, outgoing, websocketUrl);
   }
 
-  async run(): Promise<ConnectorResult> {
+  async run(): Promise<void> {
     const log: Logger = log0.sub(Server.name);
     const { websocketUrl } = this;
     log(`Becoming the server at ${websocketUrl}...`);
@@ -43,7 +42,6 @@ export class Server<T extends MessageT> extends BaseConnectorWithUrl<T> {
         log(
           "Can't server, because address in use. Try being something else instead...",
         );
-        return this.closed ? "stop" : "try_next";
       } else {
         log("Unexpected error:", e);
         throw e;
@@ -52,45 +50,50 @@ export class Server<T extends MessageT> extends BaseConnectorWithUrl<T> {
       log(`No longer the server at ${websocketUrl}.`);
       this.removeEventListener("close", listenerCloser);
     }
-    return this.closed ? "stop" : "retry";
   }
 
   private async handleHttp(conn: Deno.Conn): Promise<void> {
     const log1: Logger = log0.sub(this.handleHttp.name);
-    for await (const requestEvent of Deno.serveHttp(conn)) {
-      if (requestEvent) {
-        const { request }: Deno.RequestEvent = requestEvent;
-        const { socket: client, response }: Deno.WebSocketUpgrade = Deno
-          .upgradeWebSocket(request);
-        const log: Logger = log1.sub("webSocket");
+    const closer = () => conn.close();
+    this.addEventListener("close", closer);
+    try {
+      for await (const requestEvent of Deno.serveHttp(conn)) {
+        if (requestEvent) {
+          const { request }: Deno.RequestEvent = requestEvent;
+          const { socket: client, response }: Deno.WebSocketUpgrade = Deno
+            .upgradeWebSocket(request);
+          const log: Logger = log1.sub("webSocket");
 
-        const messageListener: MessageListener<T> = (message: T) =>
-          client.send(message);
+          const messageListener: MessageListener<T> = (message: T) =>
+            client.send(message);
 
-        client.onopen = () => {
-          log.sub("onopen")("socket is open.");
-          this.clients.add(client);
-          this.outgoing.addMessageListener(messageListener);
-        };
-        client.onmessage = (e: MessageEvent) => {
-          log.sub("onmessage")(e.data);
-          [...this.clients.values()]
-            .filter(isNot(client))
-            .forEach((client) => client.send(e.data));
-        };
-        client.onclose = () => {
-          log.sub("onclose")("");
-          this.clients.delete(client);
-          this.outgoing.removeMessageListener(messageListener);
-        };
-        client.onerror = (e) => {
-          log.sub("onerror")(
-            ":",
-            e instanceof ErrorEvent ? e?.message ?? e : e,
-          );
-        };
-        await requestEvent.respondWith(response);
+          client.onopen = () => {
+            log.sub("onopen")("socket is open.");
+            this.clients.add(client);
+            this.outgoing.addMessageListener(messageListener);
+          };
+          client.onmessage = (e: MessageEvent) => {
+            log.sub("onmessage")(e.data);
+            [...this.clients.values()]
+              .filter(isNot(client))
+              .forEach((client) => client.send(e.data));
+          };
+          client.onclose = () => {
+            log.sub("onclose")("");
+            this.clients.delete(client);
+            this.outgoing.removeMessageListener(messageListener);
+          };
+          client.onerror = (e) => {
+            log.sub("onerror")(
+              ":",
+              e instanceof ErrorEvent ? e?.message ?? e : e,
+            );
+          };
+          await requestEvent.respondWith(response);
+        }
       }
+    } finally {
+      this.removeEventListener("close", closer);
     }
   }
 }

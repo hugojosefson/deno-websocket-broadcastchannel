@@ -35,7 +35,7 @@ function possiblyUnregisterConnector() {
 const channelSets: Map<string, Set<WebSocketBroadcastChannel<MessageT>>> =
   new Map();
 
-function registerChannel(channel: WebSocketBroadcastChannel<MessageT>): void {
+function _registerChannel(channel: WebSocketBroadcastChannel<MessageT>): void {
   ensureConnector();
   const { name } = channel;
   if (!channelSets.has(name)) {
@@ -66,7 +66,7 @@ function getChannelSet(name: string): Set<WebSocketBroadcastChannel<MessageT>> {
   return channelSets.get(name)!;
 }
 
-function foreachChannelDo(
+function _foreachChannelDo(
   name: string,
   callback: (channel: WebSocketBroadcastChannel<MessageT>) => void,
 ): void {
@@ -79,7 +79,7 @@ function foreachChannelDo(
 }
 
 const incoming: MessageListener<MessageT> = function incoming(
-  message: MessageT,
+  _message: MessageT,
 ) {
   // TODO: Handle incoming messages.
 };
@@ -107,7 +107,7 @@ export class WebSocketBroadcastChannel<T extends MessageT> extends EventTarget {
     unregisterChannel(this);
     this.dispatchEvent(new Event("close"));
   }
-  private assertNotClosed() {
+  protected assertNotClosed() {
     if (this.closed) {
       throw new Error(
         `BroadcastChannel(${JSON.stringify(this.name)}) is closed`,

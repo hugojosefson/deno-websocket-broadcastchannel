@@ -1,6 +1,6 @@
 import { DEFAULT_SLEEP_DURATION_MS, loopingIterator, sleep } from "../fn.ts";
 import { Logger, logger } from "../log.ts";
-import { BaseConnector, Connector, ConnectorResult, MessageT } from "./mod.ts";
+import { BaseConnector, Connector, MessageT } from "./mod.ts";
 
 const log: Logger = logger(import.meta.url);
 export class LoopingConnector<T extends MessageT> extends BaseConnector<T>
@@ -10,26 +10,19 @@ export class LoopingConnector<T extends MessageT> extends BaseConnector<T>
     connectors: Connector<T>[],
   ) {
     super();
+    for (const connector of connectors) {
+      this.addEventListener("close", () => connector.close());
+    }
     this.connectors = loopingIterator(connectors);
   }
-  async run(): Promise<ConnectorResult> {
-    let result: ConnectorResult = "stop";
+  async run(): Promise<void> {
+    this.assertNotClosed();
     for (const connector of this.connectors) {
-      do {
-        result = await connector.run();
-        log("result", result);
-        if (this.closed) {
-          return "stop";
-        }
-        await sleep(DEFAULT_SLEEP_DURATION_MS, log);
-      } while (result === "retry");
-
-      if (result === "try_next") {
-        continue;
+      await connector.run();
+      if (this.closed) {
+        return;
       }
-
-      return result;
+      await sleep(DEFAULT_SLEEP_DURATION_MS, log);
     }
-    return result;
   }
 }

@@ -1,7 +1,6 @@
 import { Logger, logger } from "../log.ts";
 import {
   BaseConnectorWithUrl,
-  ConnectorResult,
   DEFAULT_WEBSOCKET_URL,
   MessageListener,
   MessageSender,
@@ -19,7 +18,7 @@ export class Client<T extends MessageT> extends BaseConnectorWithUrl<T> {
     super(incoming, outgoing, websocketUrl);
   }
 
-  async run(): Promise<ConnectorResult> {
+  async run(): Promise<void> {
     const log1: Logger = log0.sub(Client.name);
     const socket: WebSocket = new WebSocket(this.websocketUrl);
 
@@ -42,14 +41,11 @@ export class Client<T extends MessageT> extends BaseConnectorWithUrl<T> {
       log1.sub("socket.onmessage")("server says:", e.data);
       this.incoming(e.data);
     });
-    return await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       socket.addEventListener("close", () => {
-        const log = log1.sub("onclose");
         this.outgoing.removeMessageListener(messageListener);
         this.removeEventListener("close", socketCloser);
-        const result: ConnectorResult = this.closed ? "stop" : "try_next";
-        log(result);
-        resolve(result);
+        resolve();
       });
       socket.addEventListener("error", (e: Event) => {
         const log = log1.sub("onerror");
@@ -60,9 +56,7 @@ export class Client<T extends MessageT> extends BaseConnectorWithUrl<T> {
           reject(e);
         }
         this.outgoing.removeMessageListener(messageListener);
-        const result: ConnectorResult = this.closed ? "stop" : "try_next";
-        log(result);
-        resolve(result);
+        resolve();
       });
     });
   }

@@ -1,4 +1,3 @@
-export type ConnectorResult = "retry" | "try_next" | "stop";
 export type MessageListener<T extends MessageT> = (message: T) => void;
 export class MessageSender<T extends MessageT> {
   private readonly target: EventTarget = new EventTarget();
@@ -28,7 +27,7 @@ export class MessageSender<T extends MessageT> {
 }
 
 export interface Connector<T extends MessageT> extends EventTarget {
-  run(): Promise<ConnectorResult>;
+  run(): Promise<void>;
   close(): void;
 }
 
@@ -37,9 +36,17 @@ export const DEFAULT_WEBSOCKET_URL = new URL("ws://localhost:51799");
 export abstract class BaseConnector<T extends MessageT> extends EventTarget
   implements Connector<T> {
   protected closed = false;
-  abstract run(): Promise<ConnectorResult>;
+  abstract run(): Promise<void>;
   close() {
     this.closed = true;
+    this.dispatchEvent(new Event("close"));
+  }
+  protected assertNotClosed() {
+    if (this.closed) {
+      throw new Error(
+        `${this.constructor.name} is closed`,
+      );
+    }
   }
 }
 
@@ -54,7 +61,7 @@ export abstract class BaseConnectorWithUrl<T extends MessageT>
   ) {
     super();
   }
-  abstract run(): Promise<ConnectorResult>;
+  abstract run(): Promise<void>;
   close() {
     this.closed = true;
     this.dispatchEvent(new Event("close"));

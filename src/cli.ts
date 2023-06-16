@@ -5,12 +5,7 @@ import { Logger, logger } from "./log.ts";
 import { Server } from "./connector/server.ts";
 import { Client } from "./connector/client.ts";
 import { LoopingConnector } from "./connector/looping-connector.ts";
-import {
-  Connector,
-  ConnectorResult,
-  MessageListener,
-  MessageSender,
-} from "./connector/mod.ts";
+import { Connector, MessageListener, MessageSender } from "./connector/mod.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -27,7 +22,7 @@ async function main() {
       new Client(incoming, outgoing),
     ],
   );
-  const resultPromise: Promise<ConnectorResult> = connector.run();
+  const connectorEnd: Promise<void> = connector.run();
 
   log("continuously reading from stdin");
   const decoder = new TextDecoder();
@@ -41,8 +36,8 @@ async function main() {
   connector.close();
 
   log("waiting for looping connector to end");
-  const result = await resultPromise;
-  log("looping connector ended: ", result);
+  await connectorEnd;
+  log("looping connector ended");
 }
 
 if (import.meta.main) {
