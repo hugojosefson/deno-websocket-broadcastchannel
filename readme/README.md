@@ -59,16 +59,6 @@ where they go.
 
 ### Events
 
-#### `Connector`
-
-- `connecting` is emitted when a `Connector` is attempting to establish a
-  connection.
-- `connected` is emitted when a `Connector` has established a connection.
-- `disconnected` is emitted when a `Connector` has lost its connection.
-- `message` is emitted when a `Connector` has received a message.
-- `error` is emitted when a `Connector` has encountered an error.
-- `closed` is emitted when a `Connector` has closed.
-
 ```plantuml
 '@@include(./events-connector.puml)
 ```

@@ -1,44 +1,75 @@
 @startuml
 !include style.puml /' @@include(./style.puml) '/
 
-title "Events emitted among components"
+title "<color:#1F648E>Events emitted<color:black> from, and <color:#DD00AA>functionsCalled()<color:black> on, components"
 
-component "LoopingConnector" as looper {
-  component "Client" as client {
-    component "WebSocket" as client_ws
-  }
-  component "Server" as server {
-    collections "WebSocket" as server_ws
-  }
-}
-component "CLI" as cli
 package "Deno" {
   component ".stdin" as stdin
   component ".stdout" as stdout
 }
 
-stdin --> cli : data
-cli --> looper : outgoing
-looper --> cli : incoming
-cli --> stdout : data
+component "CLI" as cli
 
-looper --> server : outgoing
-looper --> client : outgoing
-server --> looper : incoming
-client --> looper : incoming
+package "web-socket-broadcast-channel.ts" as mod {
 
-client_ws --> client : open
-client_ws --> client : close
-client_ws --> client : message
-client_ws --> client : error
-client --> client_ws : postMessage()
-client --> client_ws : close()
+  getConnector -[#DD00AA]-> ensureConnector
 
-server_ws --> server : open
-server_ws --> server : close
-server_ws --> server : message
-server_ws --> server : error
-server --> server_ws : postMessage()
-server --> server_ws : close()
+  ensureConnector -[#DD00AA]-> looper : <color:#DD00AA>run()
+
+  unregister -[#DD00AA]-> looper : <color:#DD00AA>close()
+
+  component "connector = LoopingConnector" as looper {
+    package "Connector" as connector {
+      component "Client" as client {
+      }
+      component "Server" as server {
+      }
+      collections "WebSocket" as ws
+    }
+  }
+  node "channelSets: Map<name, Set<WebSocketBroadcastChannel>>" as channelSets {
+    collections "WebSocketBroadcastChannel" as wsbc
+    wsbc -[#DD00AA]-> getConnector : <color:#DD00AA>getConnector()
+    wsbc -[#DD00AA]-> unregister : <color:#DD00AA>unregister()
+  }
+
+}
+
+
+
+stdin -down-> cli : chunk {msg}
+stdin -[hidden]right-> stdout
+cli -[#DD00AA]up-> stdout : <color:#DD00AA>console.log(msg)
+
+
+cli -[#DD00AA]down-> wsbc : <color:#DD00AA>new WSBC(name)
+wsbc -up-> cli : open
+cli -[#DD00AA]down-> wsbc : <color:#DD00AA>postMessage(msg)
+wsbc -up-> cli : message {msg}
+cli -[#DD00AA]down-> wsbc : <color:#DD00AA>close()
+wsbc -up-> cli : close
+wsbc -up-> cli : error
+
+wsbc -[#DD00AA]down-> looper : <color:#DD00AA>run()
+looper -up-> wsbc : open
+wsbc -[#DD00AA]down-> looper : <color:#DD00AA>postMessage(name+msg)
+looper -up-> wsbc : message {name,msg}
+wsbc -[#DD00AA]down-> looper : <color:#DD00AA>close()
+looper -up-> wsbc : close
+looper -up-> wsbc : error
+
+connector -up-> looper : open
+looper -[#DD00AA]down-> connector : <color:#DD00AA>postMessage(name+msg)
+connector -up-> looper : message {name,msg}
+connector -up-> looper : close
+connector -up-> looper : error
+
+ws -up-> connector : open
+connector -[#DD00AA]down-> ws : <color:#DD00AA>postMessage(name+msg)
+ws -up-> connector : message {name,msg}
+connector -[#DD00AA]down-> ws : <color:#DD00AA>close()
+ws -up-> connector : close
+ws -up-> connector : error
+
 
 @enduml

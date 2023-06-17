@@ -75,54 +75,81 @@ where they go.
 
 ### Events
 
-#### `Connector`
-
-- `connecting` is emitted when a `Connector` is attempting to establish a
-  connection.
-- `connected` is emitted when a `Connector` has established a connection.
-- `disconnected` is emitted when a `Connector` has lost its connection.
-- `message` is emitted when a `Connector` has received a message.
-- `error` is emitted when a `Connector` has encountered an error.
-- `closed` is emitted when a `Connector` has closed.
-
 ```plantuml
 @startuml
 !includeurl https://gist.githubusercontent.com/fishey2/7178a88643a8850908c799be1ec68fd6/raw/4335aef48010a7597f14724597d8f391c4ab9c70/example_sequence_stylesheet.iuml
 
 
-title "Events emitted among components"
+title "<color:#1F648E>Events emitted<color:black> from, and <color:#DD00AA>functionsCalled()<color:black> on, components"
 
-component "LoopingConnector" as looper {
-  component "Client" as client {
-    component "WebSocket" as client_ws
-  }
-  component "Server" as server {
-    component "WebSocket" as server_ws
-  }
+package "Deno" {
+  component ".stdin" as stdin
+  component ".stdout" as stdout
 }
+
 component "CLI" as cli
-component "Deno.stdin" as stdin
-component "Deno.stdout" as stdout
 
-stdin --> cli : data
-cli --> looper : outgoing
-looper --> cli : incoming
-cli --> stdout : data
+package "web-socket-broadcast-channel.ts" as mod {
 
-looper --> server : outgoing
-looper --> client : outgoing
-server --> looper : incoming
-client --> looper : incoming
+  getConnector -[#DD00AA]-> ensureConnector
 
-client_ws --> client : open
-client_ws --> client : close
-client_ws --> client : message
-client_ws --> client : error
+  ensureConnector -[#DD00AA]-> looper : <color:#DD00AA>run()
 
-server_ws --> server : open
-server_ws --> server : close
-server_ws --> server : message
-server_ws --> server : error
+  unregister -[#DD00AA]-> looper : <color:#DD00AA>close()
+
+  component "connector = LoopingConnector" as looper {
+    package "Connector" as connector {
+      component "Client" as client {
+      }
+      component "Server" as server {
+      }
+      collections "WebSocket" as ws
+    }
+  }
+  node "channelSets: Map<name, Set<WebSocketBroadcastChannel>>" as channelSets {
+    collections "WebSocketBroadcastChannel" as wsbc
+    wsbc -[#DD00AA]-> getConnector : <color:#DD00AA>getConnector()
+    wsbc -[#DD00AA]-> unregister : <color:#DD00AA>unregister()
+  }
+
+}
+
+
+
+stdin -down-> cli : chunk {msg}
+stdin -[hidden]right-> stdout
+cli -[#DD00AA]up-> stdout : <color:#DD00AA>console.log(msg)
+
+
+cli -[#DD00AA]down-> wsbc : <color:#DD00AA>new WSBC(name)
+wsbc -up-> cli : open
+cli -[#DD00AA]down-> wsbc : <color:#DD00AA>postMessage(msg)
+wsbc -up-> cli : message {msg}
+cli -[#DD00AA]down-> wsbc : <color:#DD00AA>close()
+wsbc -up-> cli : close
+wsbc -up-> cli : error
+
+wsbc -[#DD00AA]down-> looper : <color:#DD00AA>run()
+looper -up-> wsbc : open
+wsbc -[#DD00AA]down-> looper : <color:#DD00AA>postMessage(name+msg)
+looper -up-> wsbc : message {name,msg}
+wsbc -[#DD00AA]down-> looper : <color:#DD00AA>close()
+looper -up-> wsbc : close
+looper -up-> wsbc : error
+
+connector -up-> looper : open
+looper -[#DD00AA]down-> connector : <color:#DD00AA>postMessage(name+msg)
+connector -up-> looper : message {name,msg}
+connector -up-> looper : close
+connector -up-> looper : error
+
+ws -up-> connector : open
+connector -[#DD00AA]down-> ws : <color:#DD00AA>postMessage(name+msg)
+ws -up-> connector : message {name,msg}
+connector -[#DD00AA]down-> ws : <color:#DD00AA>close()
+ws -up-> connector : close
+ws -up-> connector : error
+
 
 @enduml
 ```
