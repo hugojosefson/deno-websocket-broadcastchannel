@@ -1,10 +1,5 @@
 import { Logger, logger } from "../log.ts";
-import {
-  BaseConnectorWithUrl,
-  DEFAULT_WEBSOCKET_URL,
-  MessageListener,
-  MessageSender,
-} from "./mod.ts";
+import { BaseConnectorWithUrl, DEFAULT_WEBSOCKET_URL } from "./mod.ts";
 import { getPortNumber, isNot } from "../fn.ts";
 
 const log0: Logger = logger(import.meta.url);
@@ -12,11 +7,9 @@ const log0: Logger = logger(import.meta.url);
 export class Server extends BaseConnectorWithUrl {
   private readonly clients: Set<WebSocket> = new Set();
   constructor(
-    incoming: MessageListener,
-    outgoing: MessageSender,
     websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {
-    super(incoming, outgoing, websocketUrl);
+    super(websocketUrl);
   }
 
   async run(): Promise<void> {
@@ -63,26 +56,32 @@ export class Server extends BaseConnectorWithUrl {
           const clientCloser = () => client.close();
           const log: Logger = log1.sub("webSocket");
 
-          const messageListener: MessageListener = (message: string) =>
-            client.send(message);
+          const outgoing: EventListener = (e: Event) => {
+            if (!(e instanceof MessageEvent)) {
+              return;
+            }
+            log.sub("outgoing")(e.data);
+            client.send(e.data);
+          };
 
           client.onopen = () => {
             log.sub("onopen")("socket is open.");
             this.addEventListener("close", clientCloser);
             this.clients.add(client);
-            this.outgoing.addMessageListener(messageListener);
+            this.addEventListener("outgoing", outgoing);
           };
           client.onmessage = (e: MessageEvent) => {
             log.sub("onmessage")(e.data);
+            this.dispatchEvent(new MessageEvent("incoming", { data: e.data }));
             [...this.clients.values()]
               .filter(isNot(client))
               .forEach((client) => client.send(e.data));
           };
           client.onclose = () => {
             log.sub("onclose")("");
-            this.removeEventListener("close", clientCloser);
             this.clients.delete(client);
-            this.outgoing.removeMessageListener(messageListener);
+            this.removeEventListener("outgoing", outgoing);
+            this.removeEventListener("close", clientCloser);
           };
           client.onerror = (e) => {
             log.sub("onerror")(

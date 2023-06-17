@@ -40,3 +40,35 @@ DEBUG='*' deno run --allow-env=DEBUG --reload --allow-net https://deno.land/x/we
 For further usage examples, see the tests:
 
 - [test/websocket-broadcastchannel.test.ts](test/websocket-broadcastchannel.test.ts)
+
+## Events
+
+Shows the components of this implementation, the events that are emitted, and
+where they go.
+
+### Components
+
+- `WebSocketBroadcastChannel` is the main class, that you use to create a
+  channel.
+- `Server` is a `Connector` that attempts to listen for incoming WebSocket
+  connections from `Client`s.
+- `Client` is a `Connector` that attempts to connect to the `Server`.
+- `LoopingConnector` is a `Connector` that attempts to use a `Server` and
+  `Client` to get connected, and keeps trying until it succeeds, alternating
+  between trying to be a `Server` and a `Client`.
+
+### Events
+
+#### `Connector`
+
+- `connecting` is emitted when a `Connector` is attempting to establish a
+  connection.
+- `connected` is emitted when a `Connector` has established a connection.
+- `disconnected` is emitted when a `Connector` has lost its connection.
+- `message` is emitted when a `Connector` has received a message.
+- `error` is emitted when a `Connector` has encountered an error.
+- `closed` is emitted when a `Connector` has closed.
+
+```plantuml
+'@@include(./events-connector.puml)
+```

@@ -1,0 +1,44 @@
+@startuml
+!include style.puml /' @@include(./style.puml) '/
+
+title "Events emitted among components"
+
+component "LoopingConnector" as looper {
+  component "Client" as client {
+    component "WebSocket" as client_ws
+  }
+  component "Server" as server {
+    collections "WebSocket" as server_ws
+  }
+}
+component "CLI" as cli
+package "Deno" {
+  component ".stdin" as stdin
+  component ".stdout" as stdout
+}
+
+stdin --> cli : data
+cli --> looper : outgoing
+looper --> cli : incoming
+cli --> stdout : data
+
+looper --> server : outgoing
+looper --> client : outgoing
+server --> looper : incoming
+client --> looper : incoming
+
+client_ws --> client : open
+client_ws --> client : close
+client_ws --> client : message
+client_ws --> client : error
+client --> client_ws : postMessage()
+client --> client_ws : close()
+
+server_ws --> server : open
+server_ws --> server : close
+server_ws --> server : message
+server_ws --> server : error
+server --> server_ws : postMessage()
+server --> server_ws : close()
+
+@enduml

@@ -1,20 +1,13 @@
 import { Logger, logger } from "../log.ts";
-import {
-  BaseConnectorWithUrl,
-  DEFAULT_WEBSOCKET_URL,
-  MessageListener,
-  MessageSender,
-} from "./mod.ts";
+import { BaseConnectorWithUrl, DEFAULT_WEBSOCKET_URL } from "./mod.ts";
 
 const log0: Logger = logger(import.meta.url);
 
 export class Client extends BaseConnectorWithUrl {
   constructor(
-    incoming: MessageListener,
-    outgoing: MessageSender,
     websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {
-    super(incoming, outgoing, websocketUrl);
+    super(websocketUrl);
   }
 
   async run(): Promise<void> {

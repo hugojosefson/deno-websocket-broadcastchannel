@@ -17,7 +17,23 @@ export class LoopingConnector extends BaseConnector implements Connector {
   async run(): Promise<void> {
     this.assertNotClosed();
     for (const connector of this.connectors) {
-      await connector.run();
+      if (this.closed) {
+        return;
+      }
+      const outgoing: EventListener = (e: Event) => {
+        connector.dispatchEvent(e);
+      };
+      const incoming: EventListener = (e: Event) => {
+        this.dispatchEvent(e);
+      };
+      this.addEventListener("outgoing", outgoing);
+      connector.addEventListener("incoming", incoming);
+      try {
+        await connector.run();
+      } finally {
+        connector.removeEventListener("incoming", incoming);
+        this.removeEventListener("outgoing", outgoing);
+      }
       if (this.closed) {
         return;
       }

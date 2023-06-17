@@ -5,23 +5,30 @@ import { Logger, logger } from "./log.ts";
 import { Server } from "./connector/server.ts";
 import { Client } from "./connector/client.ts";
 import { LoopingConnector } from "./connector/looping-connector.ts";
-import { Connector, MessageListener, MessageSender } from "./connector/mod.ts";
+import { Connector } from "./connector/mod.ts";
 
 const log0: Logger = logger(import.meta.url);
 
 async function main() {
   const log: Logger = log0.sub(main.name);
 
-  const incoming: MessageListener = log.sub("incoming");
-  const outgoing: MessageSender = new MessageSender();
+  const incoming: EventListener = function incoming(
+    event: Event,
+  ) {
+    if (!(event instanceof MessageEvent)) {
+      return;
+    }
+    log.sub("incoming")(event.data);
+  };
 
   log("starting looping connector");
   const connector: Connector = new LoopingConnector(
     [
-      new Server(incoming, outgoing),
-      new Client(incoming, outgoing),
+      new Server(),
+      new Client(),
     ],
   );
+  connector.addEventListener("incoming", incoming);
   const connectorEnd: Promise<void> = connector.run();
 
   log("continuously reading from stdin");
@@ -29,10 +36,11 @@ async function main() {
   for await (const chunk of Deno.stdin.readable) {
     const text = decoder.decode(chunk);
     log("stdin text =", text);
-    outgoing.send(text);
+    connector.dispatchEvent(new MessageEvent("outgoing", { data: text }));
   }
 
   log("stdin closed, closing connector");
+  connector.removeEventListener("incoming", incoming);
   connector.close();
 
   log("waiting for looping connector to end");
