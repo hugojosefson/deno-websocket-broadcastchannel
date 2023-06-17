@@ -53,7 +53,7 @@ export function isNot<T>(value: T): (other: T) => boolean {
  */
 export function getPortNumber(url: URL): number {
   const asNumber = parseInt(url.port);
-  if (!isNaN(asNumber)) {
+  if (!Number.isNaN(asNumber)) {
     return asNumber;
   }
   switch (url.protocol) {
@@ -68,20 +68,32 @@ export function getPortNumber(url: URL): number {
   }
 }
 
+export type ClosableIterable<T> = Deno.Closer & Iterable<T>;
+
 /**
  * Creates an iterator that loops over the given items, over and over again.
  * @param items
  */
-export function loopingIterator<T>(items: T[]): IterableIterator<T> {
+export function loopingIterator<T>(
+  items: T[],
+): ClosableIterable<T> {
   let index = 0;
+  let closed = false;
   const iterator = {
     [Symbol.iterator](): IterableIterator<T> {
       return iterator;
     },
+    close(): void {
+      closed = true;
+    },
     next(): IteratorResult<T> {
+      if (closed) {
+        return { done: true, value: undefined };
+      }
       if (items.length === 0) {
         return { done: true, value: undefined };
       }
+
       index %= items.length;
       const item: T = items[index];
       index++;
@@ -92,4 +104,18 @@ export function loopingIterator<T>(items: T[]): IterableIterator<T> {
     },
   };
   return iterator;
+}
+
+export type NoArgsConstructor<T> = new () => T;
+
+/**
+ * Creates a generator that constructs instances from an iterable of no-args constructors.
+ * @param constructors
+ */
+export function* instanceGenerator<T>(
+  constructors: Iterable<NoArgsConstructor<T>>,
+): Generator<T> {
+  for (const constructor of constructors) {
+    yield new constructor();
+  }
 }

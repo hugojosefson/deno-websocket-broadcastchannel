@@ -1,43 +1,97 @@
-import { DEFAULT_SLEEP_DURATION_MS, loopingIterator, sleep } from "../fn.ts";
+import {
+  ClosableIterable,
+  DEFAULT_SLEEP_DURATION_MS,
+  instanceGenerator,
+  loopingIterator,
+  NoArgsConstructor,
+  sleep,
+} from "../fn.ts";
 import { Logger, logger } from "../log.ts";
-import { BaseConnector, Connector } from "./mod.ts";
+import { BaseConnector, Connector, MultiplexMessage } from "./mod.ts";
+import { Server } from "./server.ts";
+import { Client } from "./client.ts";
 
 const log: Logger = logger(import.meta.url);
 export class LoopingConnector extends BaseConnector implements Connector {
-  private readonly connectors: Iterable<Connector>;
-  constructor(
-    connectors: Connector[],
-  ) {
+  constructor() {
     super();
-    for (const connector of connectors) {
-      this.addEventListener("close", () => connector.close());
-    }
-    this.connectors = loopingIterator(connectors);
+    void this.run();
   }
-  async run(): Promise<void> {
-    this.assertNotClosed();
-    for (const connector of this.connectors) {
+  private connector?: Connector;
+  private connectorIsOpen = false;
+  private messageQueue: MultiplexMessage[] = [];
+  private async run(): Promise<void> {
+    const connectorConstructors: NoArgsConstructor<Connector>[] = [
+      Server,
+      Client,
+    ];
+
+    const connectorIterator: ClosableIterable<NoArgsConstructor<Connector>> =
+      loopingIterator(connectorConstructors);
+    this.addEventListener("close", () => {
+      connectorIterator.close();
+    });
+
+    const connectors: Generator<Connector> = instanceGenerator<Connector>(
+      connectorIterator,
+    );
+    for (const connector of connectors) {
+      // If we just created a new Connector, but we were already closed,
+      // close the new Connector and stop looping.
       if (this.closed) {
-        return;
+        connector.close();
+        break;
       }
-      const outgoing: EventListener = (e: Event) => {
-        connector.dispatchEvent(e);
-      };
-      const incoming: EventListener = (e: Event) => {
+
+      // If we decide to close or if we have an error, close the connector.
+      this.addEventListener("close", () => connector.close());
+      this.addEventListener("error", () => connector.close());
+
+      // When the connector opens, set the flag and possibly send messages.
+      connector.addEventListener("open", () => {
+        this.connectorIsOpen = true;
+        this.possiblySendMessages();
+      });
+
+      // When the connector receives a message from the other process,
+      // emit it as an event from us to anyone listening outside.
+      connector.addEventListener("message", (e: Event) => {
         this.dispatchEvent(e);
-      };
-      this.addEventListener("outgoing", outgoing);
-      connector.addEventListener("incoming", incoming);
-      try {
-        await connector.run();
-      } finally {
-        connector.removeEventListener("incoming", incoming);
-        this.removeEventListener("outgoing", outgoing);
+      });
+
+      // Use this connector until it closes or errors.
+      // Then try the next connector.
+      await new Promise((resolve) => {
+        connector.addEventListener("close", resolve);
+        connector.addEventListener("error", resolve);
+      });
+      this.connectorIsOpen = false;
+      connector.close();
+
+      if (!this.closed) {
+        await sleep(DEFAULT_SLEEP_DURATION_MS, log);
       }
       if (this.closed) {
-        return;
+        break;
       }
-      await sleep(DEFAULT_SLEEP_DURATION_MS, log);
+    }
+  }
+
+  postMessage(message: MultiplexMessage): void {
+    this.messageQueue.push(message);
+    this.possiblySendMessages();
+  }
+
+  private possiblySendMessages(): void {
+    while (
+      this.connectorIsOpen &&
+      this.connector &&
+      this.messageQueue.length > 0
+    ) {
+      const message = this.messageQueue.shift();
+      if (message) {
+        this.connector.postMessage(message);
+      }
     }
   }
 }

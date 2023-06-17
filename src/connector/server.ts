@@ -96,4 +96,9 @@ export class Server extends BaseConnectorWithUrl {
       this.removeEventListener("close", connCloser);
     }
   }
+
+  postMessage(message: MultiplexMessage): void {
+    // TODO: put all clients in this.clients and send to all of them.
+    // TODO: handle them similar to how LoopingConnector handles Connectors?
+  }
 }
