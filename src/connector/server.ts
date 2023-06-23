@@ -47,6 +47,7 @@ export class Server extends BaseConnectorWithUrl {
         this.close();
       } else {
         log("Unexpected error:", e);
+        this.dispatchEvent(new ErrorEvent("error", { error: e }));
         this.close();
         throw e;
       }
@@ -112,9 +113,18 @@ export class Server extends BaseConnectorWithUrl {
             this.removeEventListener("close", socketCloser);
           };
 
+          const onSocketError = (e: Event) => {
+            log.sub(onSocketError.name)(
+              ":",
+              e instanceof ErrorEvent ? e?.message ?? e : e,
+            );
+            this.dispatchEvent(new ErrorEvent("error", { error: e }));
+          };
+
           socket.addEventListener("open", onSocketOpen);
           socket.addEventListener("message", onSocketMessage);
           socket.addEventListener("close", onSocketClose);
+          socket.addEventListener("error", onSocketError);
 
           await requestEvent.respondWith(response);
         }

@@ -27,12 +27,28 @@ export class Client extends BaseConnectorWithUrl {
     socket.addEventListener("close", () => {
       this.removeEventListener("close", socketCloser);
     });
+    socket.addEventListener("error", (e: Event) => {
+      const log = log1.sub("onerror");
+      if (e instanceof ErrorEvent && e?.message === "unexpected eof") {
+        log("webSocket lost connection to server (unexpected eof), closing webSocket.");
+        socket.close();
+      } else {
+        log("Unexpected error from webSocket:", e);
+      }
+    });
 
     socket.addEventListener("open", () => {
       log1.sub("socket.onopen")("socket is open.");
     });
     const incomingListener = (e: MessageEvent) => {
       const log2 = log1.sub("socket.onmessage");
+      if (!(e instanceof MessageEvent)) {
+        log2(
+          "Unexpected non-MessageEvent from socket:",
+          e,
+        );
+        return;
+      }
       log2("server says:", e.data);
       const multiplexMessage: MultiplexMessage = extractAnyMultiplexMessage(e);
       log2(
