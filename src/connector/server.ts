@@ -14,6 +14,7 @@ export class Server extends BaseConnectorWithUrl {
     websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {
     super(websocketUrl);
+    void this.run();
   }
 
   async run(): Promise<void> {
@@ -38,8 +39,11 @@ export class Server extends BaseConnectorWithUrl {
         log(
           "Can't server, because address in use. Try being something else instead...",
         );
+        this.close();
       } else {
         log("Unexpected error:", e);
+        this.dispatchEvent(new ErrorEvent("error", { error: e }));
+        this.close();
         throw e;
       }
     } finally {

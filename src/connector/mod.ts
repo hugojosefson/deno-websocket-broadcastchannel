@@ -10,6 +10,12 @@ export interface Connector extends EventTarget, Deno.Closer {
 export abstract class NamedClosableEventTarget extends EventTarget
   implements Deno.Closer {
   protected closed = false;
+  public get isClosed(): boolean {
+    return this.closed;
+  }
+  public get isOpen(): boolean {
+    return !this.closed;
+  }
   public readonly name: string;
   protected constructor(name?: string) {
     super();

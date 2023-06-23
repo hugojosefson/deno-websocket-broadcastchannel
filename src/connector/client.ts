@@ -15,6 +15,7 @@ export class Client extends BaseConnectorWithUrl {
   ) {
     super(websocketUrl);
     const log1: Logger = log0.sub(Client.name);
+    log1(`Becoming the client to ${websocketUrl}...`);
     this.socket = new WebSocket(this.websocketUrl);
     const socket: WebSocket = this.socket;
 
@@ -38,6 +39,10 @@ export class Client extends BaseConnectorWithUrl {
         );
       }
       const multiplexMessage: MultiplexMessage = possiblyMultiplexMessage;
+      log1.sub("socket.onmessage")(
+        `dispatching message on ${this.name}:`,
+        multiplexMessage,
+      );
       this.dispatchEvent(
         new MessageEvent("message", { data: multiplexMessage }),
       );
