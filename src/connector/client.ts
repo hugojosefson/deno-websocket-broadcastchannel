@@ -4,7 +4,7 @@ import {
   DEFAULT_WEBSOCKET_URL,
   MultiplexMessage,
 } from "./mod.ts";
-import { isMultiplexMessage } from "../fn.ts";
+import { asMultiplexMessageEvent, extractAnyMultiplexMessage } from "../fn.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -30,22 +30,21 @@ export class Client extends BaseConnectorWithUrl {
       // TODO: possibly queue messages until socket is open? then try to send them?
     });
     const incomingListener = (e: MessageEvent) => {
-      log1.sub("socket.onmessage")("server says:", e.data);
-      const possiblyMultiplexMessage = JSON.parse(e.data);
-      if (!(isMultiplexMessage(possiblyMultiplexMessage))) {
-        throw new Error(
-          "server sent non-multiplex message",
-          possiblyMultiplexMessage,
+      const log2 = log1.sub("socket.onmessage");
+      if (!(e instanceof MessageEvent)) {
+        log2(
+          "Unexpected non-MessageEvent from socket:",
+          e,
         );
+        return;
       }
-      const multiplexMessage: MultiplexMessage = possiblyMultiplexMessage;
-      log1.sub("socket.onmessage")(
-        `dispatching message on ${this.name}:`,
+      log2("server says:", e.data);
+      const multiplexMessage: MultiplexMessage = extractAnyMultiplexMessage(e);
+      log2(
+        `dispatching multiplexMessage on ${this.name}:`,
         multiplexMessage,
       );
-      this.dispatchEvent(
-        new MessageEvent("message", { data: multiplexMessage }),
-      );
+      this.dispatchEvent(asMultiplexMessageEvent(multiplexMessage));
     };
     socket.addEventListener("message", incomingListener);
 

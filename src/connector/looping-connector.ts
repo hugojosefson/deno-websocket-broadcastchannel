@@ -1,6 +1,8 @@
 import {
+  asMultiplexMessageEvent,
   ClosableIterable,
   DEFAULT_SLEEP_DURATION_MS,
+  extractAnyMultiplexMessage,
   instanceGenerator,
   loopingIterator,
   NoArgsConstructor,
@@ -81,11 +83,18 @@ export class LoopingConnector extends BaseConnector {
         // When the connector receives a message from the other process,
         // emit it as an event from us to anyone listening outside.
         connector.addEventListener("message", (e: Event) => {
-          log2(
-            "connector.addEventListener('message', ...); this.dispatchEvent(new MessageEvent(\"message\", e))...",
+          log2("connector.addEventListener('message', ...);", e);
+          if (!(e instanceof MessageEvent)) {
+            log2(
+              "Unexpected non-MessageEvent from connector:",
+              e,
+            );
+            return;
+          }
+          const multiplexMessage: MultiplexMessage = extractAnyMultiplexMessage(
             e,
           );
-          this.dispatchEvent(new MessageEvent("message", e));
+          this.dispatchEvent(asMultiplexMessageEvent(multiplexMessage));
         });
 
         // Use this connector until it closes or errors.

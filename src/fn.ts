@@ -124,15 +124,36 @@ export function* instanceGenerator<T>(
 export function isMultiplexMessage(
   message: unknown,
 ): message is MultiplexMessage {
-  if (typeof message !== "object") {
-    return false;
+  return typeof message === "object" &&
+    message !== null &&
+    typeof (message as Partial<MultiplexMessage>)?.channel !== "string" &&
+    typeof (message as Partial<MultiplexMessage>)?.message === "string";
+}
+
+/**
+ * Extracts any MultiplexMessage object from an Event, if present.
+ * Throws if the event does not contain a MultiplexMessage.
+ * @param event
+ */
+export function extractAnyMultiplexMessage(event: Event): MultiplexMessage {
+  try {
+    if (event instanceof MessageEvent) {
+      const parsed = JSON.parse(event.data);
+      if (isMultiplexMessage(parsed)) {
+        return parsed as MultiplexMessage;
+      }
+    }
+  } catch {
+    // fall-through to error
   }
-  if (message === null) {
-    return false;
-  }
-  const asObject = message as Record<string, unknown>;
-  if (typeof asObject.channel !== "string") {
-    return false;
-  }
-  return typeof asObject.message === "string";
+  throw new Error(`Event contained non-multiplex message: ${event}`);
+}
+
+export function asMultiplexMessageEvent(
+  multiplexMessage: MultiplexMessage,
+  type = "message",
+): MessageEvent {
+  return new MessageEvent(type, {
+    data: JSON.stringify(multiplexMessage),
+  });
 }

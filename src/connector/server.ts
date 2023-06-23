@@ -4,12 +4,17 @@ import {
   DEFAULT_WEBSOCKET_URL,
   MultiplexMessage,
 } from "./mod.ts";
-import { getPortNumber, isNot } from "../fn.ts";
+import {
+  asMultiplexMessageEvent,
+  extractAnyMultiplexMessage,
+  getPortNumber,
+  isNot,
+} from "../fn.ts";
 
 const log0: Logger = logger(import.meta.url);
 
 export class Server extends BaseConnectorWithUrl {
-  private readonly clients: Set<WebSocket> = new Set();
+  private readonly sockets: Set<WebSocket> = new Set();
   constructor(
     websocketUrl: URL = DEFAULT_WEBSOCKET_URL,
   ) {
@@ -59,44 +64,68 @@ export class Server extends BaseConnectorWithUrl {
       for await (const requestEvent of Deno.serveHttp(conn)) {
         if (requestEvent) {
           const { request }: Deno.RequestEvent = requestEvent;
-          const { socket: client, response }: Deno.WebSocketUpgrade = Deno
+          const { socket, response }: Deno.WebSocketUpgrade = Deno
             .upgradeWebSocket(request);
-          const clientCloser = () => client.close();
+          const socketCloser = () => socket.close();
           const log: Logger = log1.sub("webSocket");
 
           const outgoing: EventListener = (e: Event) => {
             if (!(e instanceof MessageEvent)) {
               return;
             }
-            log.sub("outgoing")(e.data);
-            client.send(e.data);
+            log.sub(outgoing.name)(e.data);
+            socket.send(e.data);
           };
 
-          client.onopen = () => {
-            log.sub("onopen")("socket is open.");
-            this.addEventListener("close", clientCloser);
-            this.clients.add(client);
+          const onSocketOpen = () => {
+            log.sub(onSocketOpen.name)("socket is open.");
+            this.addEventListener("close", socketCloser);
+            this.sockets.add(socket);
             this.addEventListener("outgoing", outgoing);
           };
-          client.onmessage = (e: MessageEvent) => {
-            log.sub("onmessage")(e.data);
-            this.dispatchEvent(new MessageEvent("incoming", { data: e.data }));
-            [...this.clients.values()]
-              .filter(isNot(client))
-              .forEach((client) => client.send(e.data));
+
+          const onSocketMessage = (e: MessageEvent) => {
+            const log2 = log.sub(onSocketMessage.name);
+            if (!(e instanceof MessageEvent)) {
+              log2(
+                "Unexpected non-MessageEvent from socket:",
+                e,
+              );
+              return;
+            }
+            const multiplexMessage: MultiplexMessage =
+              extractAnyMultiplexMessage(e);
+            this.dispatchEvent(asMultiplexMessageEvent(multiplexMessage));
+            this.dispatchEvent(
+              asMultiplexMessageEvent(multiplexMessage, "incoming"),
+            );
+            [...this.sockets.values()]
+              .filter(isNot(socket))
+              .forEach((socket) =>
+                socket.send(JSON.stringify(multiplexMessage))
+              );
           };
-          client.onclose = () => {
-            log.sub("onclose")("");
-            this.clients.delete(client);
+
+          const onSocketClose = () => {
+            log.sub(onSocketClose.name)("socket is closed.");
+            this.sockets.delete(socket);
             this.removeEventListener("outgoing", outgoing);
-            this.removeEventListener("close", clientCloser);
+            this.removeEventListener("close", socketCloser);
           };
-          client.onerror = (e) => {
-            log.sub("onerror")(
+
+          const onSocketError = (e: Event) => {
+            log.sub(onSocketError.name)(
               ":",
               e instanceof ErrorEvent ? e?.message ?? e : e,
             );
+            this.dispatchEvent(new ErrorEvent("error", { error: e }));
           };
+
+          socket.addEventListener("open", onSocketOpen);
+          socket.addEventListener("message", onSocketMessage);
+          socket.addEventListener("close", onSocketClose);
+          socket.addEventListener("error", onSocketError);
+
           await requestEvent.respondWith(response);
         }
       }
@@ -106,8 +135,8 @@ export class Server extends BaseConnectorWithUrl {
   }
 
   postMessage(message: MultiplexMessage): void {
-    for (const client of this.clients) {
-      client.send(JSON.stringify(message));
+    for (const socket of this.sockets) {
+      socket.send(JSON.stringify(message));
     }
   }
 }

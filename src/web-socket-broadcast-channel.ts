@@ -4,7 +4,7 @@ import {
   NamedClosableEventTarget,
 } from "./connector/mod.ts";
 import { LoopingConnector } from "./connector/looping-connector.ts";
-import { isMultiplexMessage } from "./fn.ts";
+import { asMultiplexMessageEvent, extractAnyMultiplexMessage } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
 
 const log0: Logger = logger(import.meta.url);
@@ -54,21 +54,20 @@ function ensureConnector() {
     connector.addEventListener("message", (e: Event) => {
       const log = log1.sub("connector.addEventListener('message', ...)");
       log("connector message:", e);
-
       if (!(e instanceof MessageEvent)) {
-        log("connector message was not a MessageEvent; ignoring.");
+        log(
+          "Unexpected non-MessageEvent from connector:",
+          e,
+        );
         return;
       }
-      if (!(isMultiplexMessage(e.data))) {
-        log("connector message was not a MultiplexMessage; ignoring.");
-        return;
-      }
-      const { channel: channelName, message }: MultiplexMessage = e.data;
-      log("connector message is a MultiplexMessage:", { channelName, message });
-      const channels = getChannelSetOrDisconnectedEmptySet(channelName);
+      const multiplexMessage: MultiplexMessage = extractAnyMultiplexMessage(e);
+      log("connector message is a MultiplexMessage:", multiplexMessage);
+      const channels: Set<WebSocketBroadcastChannel> =
+        getChannelSetOrDisconnectedEmptySet(multiplexMessage.channel);
       for (const channel of channels) {
         log("dispatching message to channel:", channel.name);
-        channel.dispatchEvent(new MessageEvent("message", { data: message }));
+        channel.dispatchEvent(asMultiplexMessageEvent(multiplexMessage));
       }
     });
   }
