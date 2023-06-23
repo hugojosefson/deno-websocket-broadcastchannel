@@ -50,5 +50,4 @@ export abstract class BaseConnectorWithUrl extends BaseConnector {
   ) {
     super(`${BaseConnectorWithUrl.name}(${websocketUrl})`);
   }
-  abstract run(): Promise<void>;
 }

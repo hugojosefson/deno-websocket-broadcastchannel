@@ -15,7 +15,7 @@ export class Client extends BaseConnectorWithUrl {
   ) {
     super(websocketUrl);
     const log1: Logger = log0.sub(Client.name);
-    log1(`Becoming the client to ${websocketUrl}...`);
+    log1(`Becoming a client to ${websocketUrl}...`);
     this.socket = new WebSocket(this.websocketUrl);
     const socket: WebSocket = this.socket;
 
@@ -24,10 +24,12 @@ export class Client extends BaseConnectorWithUrl {
       socket.close();
     }
     this.addEventListener("close", socketCloser);
+    socket.addEventListener("close", () => {
+      this.removeEventListener("close", socketCloser);
+    });
 
     socket.addEventListener("open", () => {
       log1.sub("socket.onopen")("socket is open.");
-      // TODO: possibly queue messages until socket is open? then try to send them?
     });
     const incomingListener = (e: MessageEvent) => {
       const log2 = log1.sub("socket.onmessage");
@@ -40,21 +42,10 @@ export class Client extends BaseConnectorWithUrl {
       this.dispatchEvent(asMultiplexMessageEvent(multiplexMessage));
     };
     socket.addEventListener("message", incomingListener);
-
-    void new Promise<void>((resolve) => {
-      socket.addEventListener("close", () => {
-        this.removeEventListener("close", socketCloser);
-        resolve();
-      });
-    });
-  }
-
-  run(): Promise<void> {
-    throw new Error("This should not be called.");
   }
 
   postMessage(message: MultiplexMessage): void {
-    // TODO: possibly queue messages until socket is open? then try to send them?
+    this.assertNotClosed();
     this.socket.send(JSON.stringify(message));
   }
 }
