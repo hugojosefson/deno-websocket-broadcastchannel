@@ -62,13 +62,9 @@ export class LoopingConnector extends BaseConnector {
           break;
         }
 
-        // If we decide to close or if we have an error, close the connector.
+        // If we decide to close, close the connector.
         this.addEventListener("close", () => {
           log2("this.addEventListener('close', ...); closing connector...");
-          connector.close();
-        });
-        this.addEventListener("error", () => {
-          log2("this.addEventListener('error', ...); closing connector...");
           connector.close();
         });
 
@@ -97,14 +93,13 @@ export class LoopingConnector extends BaseConnector {
           this.dispatchEvent(asMultiplexMessageEvent(multiplexMessage));
         });
 
-        // Use this connector until it closes or errors.
+        // Use this connector until it closes.
         // Then try the next connector.
-        log2("awaiting connector to close or error...");
+        log2("awaiting connector to close...");
         await new Promise((resolve) => {
           connector.addEventListener("close", resolve);
-          connector.addEventListener("error", resolve);
         });
-        log2("connector closed or errored.");
+        log2("connector closed.");
         connector.close();
 
         if (!this.closed) {

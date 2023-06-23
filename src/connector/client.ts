@@ -31,13 +31,6 @@ export class Client extends BaseConnectorWithUrl {
     });
     const incomingListener = (e: MessageEvent) => {
       const log2 = log1.sub("socket.onmessage");
-      if (!(e instanceof MessageEvent)) {
-        log2(
-          "Unexpected non-MessageEvent from socket:",
-          e,
-        );
-        return;
-      }
       log2("server says:", e.data);
       const multiplexMessage: MultiplexMessage = extractAnyMultiplexMessage(e);
       log2(
@@ -48,19 +41,9 @@ export class Client extends BaseConnectorWithUrl {
     };
     socket.addEventListener("message", incomingListener);
 
-    void new Promise<void>((resolve, reject) => {
+    void new Promise<void>((resolve) => {
       socket.addEventListener("close", () => {
         this.removeEventListener("close", socketCloser);
-        resolve();
-      });
-      socket.addEventListener("error", (e: Event) => {
-        const log = log1.sub("onerror");
-        if (e instanceof ErrorEvent && e?.message === "unexpected eof") {
-          log("webSocket lost connection to server.");
-        } else {
-          log("Unexpected error from webSocket:", e);
-          reject(e);
-        }
         resolve();
       });
     });

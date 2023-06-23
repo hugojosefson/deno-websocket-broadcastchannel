@@ -35,22 +35,6 @@ function ensureConnector() {
       connector = undefined;
     });
 
-    connector.addEventListener("error", (e: Event) => {
-      const log = log1.sub("connector.addEventListener('error', ...)");
-      log("connector error:", e);
-
-      log("dispatching error events to channels...");
-      for (const channelSet of channelSets.values()) {
-        for (const channel of channelSet) {
-          log("dispatching error event to channel:", channel.name);
-          channel.dispatchEvent(new ErrorEvent("error", e));
-
-          log("unregistering channel:", channel.name);
-          unregisterChannel(channel);
-        }
-      }
-    });
-
     connector.addEventListener("message", (e: Event) => {
       const log = log1.sub("connector.addEventListener('message', ...)");
       log("connector message:", e);
