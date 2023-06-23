@@ -12,10 +12,12 @@ async function main() {
   const incoming: EventListener = function incoming(
     event: Event,
   ) {
+    const log1 = log.sub("incoming");
     if (!(event instanceof MessageEvent)) {
+      log1("not a MessageEvent");
       return;
     }
-    log.sub("incoming")(event.data);
+    Deno.stdout.writeSync(new TextEncoder().encode(event.data));
   };
 
   const chat = new WebSocketBroadcastChannel("chat");
