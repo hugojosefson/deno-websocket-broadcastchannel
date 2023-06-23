@@ -1,11 +1,49 @@
-import { Connector, NamedClosableEventTarget } from "./connector/mod.ts";
+import {
+  Connector,
+  MultiplexMessage,
+  NamedClosableEventTarget,
+} from "./connector/mod.ts";
 import { LoopingConnector } from "./connector/looping-connector.ts";
+import { isMultiplexMessage } from "./fn.ts";
 
 let connector: Connector | undefined = undefined;
 
 function ensureConnector() {
   if (connector === undefined) {
     connector = new LoopingConnector();
+
+    connector.addEventListener("close", () => {
+      for (const channelSet of channelSets.values()) {
+        for (const channel of channelSet) {
+          channel.dispatchEvent(new CloseEvent("close"));
+          unregisterChannel(channel);
+        }
+      }
+      connector = undefined;
+    });
+
+    connector.addEventListener("error", (e: Event) => {
+      for (const channelSet of channelSets.values()) {
+        for (const channel of channelSet) {
+          channel.dispatchEvent(new ErrorEvent("error", e));
+          unregisterChannel(channel);
+        }
+      }
+    });
+
+    connector.addEventListener("message", (e: Event) => {
+      if (!(e instanceof MessageEvent)) {
+        return;
+      }
+      if (!(isMultiplexMessage(e.data))) {
+        return;
+      }
+      const { channel: channelName, message }: MultiplexMessage = e.data;
+      const channels = getChannelSetOrDisconnectedEmptySet(channelName);
+      for (const channel of channels) {
+        channel.dispatchEvent(new MessageEvent("message", { data: message }));
+      }
+    });
   }
 }
 
@@ -30,7 +68,7 @@ function registerChannel(
 ): void {
   ensureConnector();
   channel.addEventListener("close", () => unregisterChannel(channel));
-  getChannelSet(channel.name).add(channel);
+  getOrCreateChannelSet(channel.name).add(channel);
 }
 
 function unregisterChannel(
@@ -46,13 +84,19 @@ function unregisterChannel(
   possiblyUnregisterConnector();
 }
 
-function getChannelSet(
+function getOrCreateChannelSet(
   name: string,
 ): Set<WebSocketBroadcastChannel> {
   if (!channelSets.has(name)) {
     channelSets.set(name, new Set());
   }
   return channelSets.get(name)!;
+}
+
+function getChannelSetOrDisconnectedEmptySet(
+  name: string,
+): Set<WebSocketBroadcastChannel> {
+  return channelSets.get(name) ?? new Set();
 }
 
 export class WebSocketBroadcastChannel extends NamedClosableEventTarget {

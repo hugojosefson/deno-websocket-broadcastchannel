@@ -1,4 +1,5 @@
 import { Logger, logger } from "./log.ts";
+import { MultiplexMessage } from "./connector/mod.ts";
 
 /**
  * Checks if we are definitively allowed to access a given environment variable.
@@ -118,4 +119,20 @@ export function* instanceGenerator<T>(
   for (const constructor of constructors) {
     yield new constructor();
   }
+}
+
+export function isMultiplexMessage(
+  message: unknown,
+): message is MultiplexMessage {
+  if (typeof message !== "object") {
+    return false;
+  }
+  if (message === null) {
+    return false;
+  }
+  const asObject = message as Record<string, unknown>;
+  if (typeof asObject.channel !== "string") {
+    return false;
+  }
+  return typeof asObject.message === "string";
 }

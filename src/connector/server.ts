@@ -1,5 +1,9 @@
 import { Logger, logger } from "../log.ts";
-import { BaseConnectorWithUrl, DEFAULT_WEBSOCKET_URL } from "./mod.ts";
+import {
+  BaseConnectorWithUrl,
+  DEFAULT_WEBSOCKET_URL,
+  MultiplexMessage,
+} from "./mod.ts";
 import { getPortNumber, isNot } from "../fn.ts";
 
 const log0: Logger = logger(import.meta.url);
@@ -98,7 +102,8 @@ export class Server extends BaseConnectorWithUrl {
   }
 
   postMessage(message: MultiplexMessage): void {
-    // TODO: put all clients in this.clients and send to all of them.
-    // TODO: handle them similar to how LoopingConnector handles Connectors?
+    for (const client of this.clients) {
+      client.send(JSON.stringify(message));
+    }
   }
 }
