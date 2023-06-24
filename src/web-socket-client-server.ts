@@ -1,20 +1,17 @@
 import {
-  WebSocketClientEvent,
   WebSocketClientMessageEvent,
   WebSocketServer,
 } from "./web-socket-server.ts";
-import {
-  getPortNumber,
-  MultiplexMessage,
-  s,
-  safely,
-  webSocketReadyState,
-} from "./fn.ts";
+import { getPortNumber, s, safely, webSocketReadyState } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export type WhatAmI = "closed" | "client" | "server";
+export type WhatAmI =
+  | "server"
+  | "client"
+  | "closed";
+
 export const DEFAULT_WEBSOCKET_URL = new URL("ws://localhost:51799");
 
 export class WebSocketClientServer extends EventTarget implements Deno.Closer {
@@ -22,7 +19,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
   private whatAmI: WhatAmI = "server";
   private wss?: WebSocketServer;
   private ws?: WebSocket;
-  private outgoingMessages: MultiplexMessage[] = [];
+  private outgoingMessages: string[] = [];
 
   constructor(
     private readonly url: URL = DEFAULT_WEBSOCKET_URL,
@@ -61,13 +58,28 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
 
               this.wss.addEventListener(
                 "client:message",
-                (event: WebSocketClientMessageEvent) => {
+                (event: Event) => {
                   log3("client:message");
-                  this.dispatchEvent(
-                    new MessageEvent("message", {
-                      data: JSON.parse(event.data.clientEvent.data),
-                    }),
-                  );
+                  if (event instanceof WebSocketClientMessageEvent) {
+                    // noinspection UnnecessaryLocalVariableJS
+                    const webSocketClientMessageEvent:
+                      WebSocketClientMessageEvent = event;
+                    const data =
+                      webSocketClientMessageEvent.data.clientEvent.data;
+                    log3(`dispatching message event with data: ${s(data)}...`);
+                    this.dispatchEvent(
+                      new MessageEvent("message", { data }),
+                    );
+                    log3(`dispatched message event`);
+
+                    log3(`broadcasting message to clients...`);
+                    this.sendMessage(data, webSocketClientMessageEvent.data.ws);
+                    log3(`broadcasted message to clients`);
+                  } else {
+                    log3(
+                      `event not instanceof WebSocketClientMessageEvent: ${event.constructor.name}`,
+                    );
+                  }
                 },
               );
             });
@@ -139,11 +151,11 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
       const ws = this.ws;
       this.ws = undefined;
       safely(() => {
-        log1(`ws.readyState === ${webSocketReadyState(ws)}`);
+        log1(`ws.readyState === ${webSocketReadyState(ws.readyState)}`);
         log1(`closing ws...`);
         ws.close();
         log1(`closed ws`);
-        log1(`ws.readyState === ${webSocketReadyState(ws)}`);
+        log1(`ws.readyState === ${webSocketReadyState(ws.readyState)}`);
       });
     }
     if (this.whatAmI === "client") {
@@ -165,11 +177,15 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
         log1(`wss.clients.size === ${s(wss.clients.size)}`);
         for (const client of wss.clients) {
           safely(() => {
-            log1(`client.readyState === ${webSocketReadyState(client)}`);
+            log1(
+              `client.readyState === ${webSocketReadyState(client.readyState)}`,
+            );
             log1(`closing client...`);
             client.close();
             log1(`closed client`);
-            log1(`client.readyState === ${webSocketReadyState(client)}`);
+            log1(
+              `client.readyState === ${webSocketReadyState(client.readyState)}`,
+            );
           });
         }
       });
@@ -223,7 +239,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
     this.dispatchEvent(new Event("close"));
   }
 
-  postMessage(message: MultiplexMessage): void {
+  postMessage(message: string): void {
     const log2: Logger = this.log1.sub(this.postMessage.name);
     log2(`message: ${s(message)}`);
     if (this.isClosed()) {
@@ -234,26 +250,40 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
     this.possiblySendOutgoingMessages();
   }
 
-  private sendMessage(message: MultiplexMessage): boolean {
+  private sendMessage(message: string, exceptClient?: WebSocket): boolean {
     const log2: Logger = this.log1.sub(this.sendMessage.name);
     log2(`message: ${s(message)}`);
     let log3: Logger;
     if (this.whatAmI === "server") {
       log3 = log2.sub("server");
       if (this.wss?.isListening()) {
-        log3(`sending message to ${this.wss.clients.size} clients`);
+        log3(
+          `sending message to ${this.wss.clients.size} clients${
+            exceptClient ? " (except one of them)" : ""
+          }`,
+        );
         for (const ws of this.wss.clients) {
+          if (ws === exceptClient) {
+            log3(
+              `not sending message to client, because it's the one we're excepting`,
+            );
+            continue;
+          }
           try {
-            ws.send(JSON.stringify(message));
+            ws.send(message);
           } catch (e) {
             log3(`error sending message to client: ${s(e)}`);
             this.wss.clients.delete(ws);
           }
         }
-        log3(`sent message to ${this.wss.clients.size} clients`);
+        log3(
+          `sent message to ${this.wss.clients.size} clients${
+            exceptClient ? " (except one of them)" : ""
+          }`,
+        );
         return true;
       } else {
-        log3("not sending message to client, because not listening");
+        log3("not sending message to clients, because not listening");
         return false;
       }
     }
@@ -261,7 +291,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
       log3 = log2.sub("client");
       if (this.ws?.readyState === WebSocket.OPEN) {
         log3(`sending message to server: ${s(message)}`);
-        this.ws.send(JSON.stringify(message));
+        this.ws.send(message);
         return true;
       } else {
         log3(
@@ -282,7 +312,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
     log2(`whatAmI: ${s(this.whatAmI)}`);
 
     while (this.outgoingMessages.length > 0 && this.isConnected()) {
-      const message: MultiplexMessage = this.outgoingMessages.shift()!;
+      const message: string = this.outgoingMessages.shift()!;
       log2(`sending message: ${s(message)}`);
       const didSendMessage = this.sendMessage(message);
       log2(`didSendMessage: ${didSendMessage}`);

@@ -1,9 +1,4 @@
-import {
-  asMessageEvent,
-  extractAnyMultiplexMessage,
-  MultiplexMessage,
-  s,
-} from "./fn.ts";
+import { extractAnyMultiplexMessage, MultiplexMessage, s } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
 import { WebSocketClientServer } from "./web-socket-client-server.ts";
 
@@ -60,7 +55,9 @@ function ensureWscs() {
         getChannelSetOrDisconnectedEmptySet(multiplexMessage.channel);
       for (const channel of channels) {
         log("dispatching message to channel:", channel.name);
-        channel.dispatchEvent(new MessageEvent("message", {data: multiplexMessage.message}));
+        channel.dispatchEvent(
+          new MessageEvent("message", { data: multiplexMessage.message }),
+        );
       }
     });
   }
@@ -170,8 +167,9 @@ export class WebSocketBroadcastChannel extends EventTarget {
       return;
     }
     const message1: MultiplexMessage = { channel: this.name, message };
-    log1(`getWscs().postMessage(${s(message1)})`);
-    getWscs().postMessage(message1);
+    const message2: string = JSON.stringify(message1);
+    log1(`getWscs().postMessage(${s(message2)})`);
+    getWscs().postMessage(message2);
   }
   close(): void {
     const log1 = this.log.sub("close");

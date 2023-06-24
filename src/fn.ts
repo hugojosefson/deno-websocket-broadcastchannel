@@ -1,6 +1,8 @@
 import { Logger, logger } from "./log.ts";
 import { WebSocketClientMessageEvent } from "./web-socket-server.ts";
 
+const log0: Logger = logger(import.meta.url);
+
 export type MultiplexMessage = {
   channel: string;
   message: string;
@@ -129,10 +131,27 @@ export function* instanceGenerator<T>(
 export function isMultiplexMessage(
   message: unknown,
 ): message is MultiplexMessage {
-  return typeof message === "object" &&
+  const log1 = log0.sub(isMultiplexMessage.name);
+  log1("message", message);
+  log1(`typeof message: ${s(typeof message)}`);
+  log1(`message !== null: ${s(message !== null)}`);
+  log1(
+    `typeof (message as Partial<MultiplexMessage>)?.channel: ${
+      s(typeof (message as Partial<MultiplexMessage>)?.channel)
+    }`,
+  );
+  log1(
+    `typeof (message as Partial<MultiplexMessage>)?.message: ${
+      s(typeof (message as Partial<MultiplexMessage>)?.message)
+    }`,
+  );
+
+  const verdict: boolean = typeof message === "object" &&
     message !== null &&
-    typeof (message as Partial<MultiplexMessage>)?.channel !== "string" &&
+    typeof (message as Partial<MultiplexMessage>)?.channel === "string" &&
     typeof (message as Partial<MultiplexMessage>)?.message === "string";
+  log1("verdict", verdict);
+  return verdict;
 }
 
 /**
@@ -141,20 +160,39 @@ export function isMultiplexMessage(
  * @param event
  */
 export function extractAnyMultiplexMessage(event: Event): MultiplexMessage {
+  const log1 = log0.sub(extractAnyMultiplexMessage.name);
+  log1("event.constructor.name", event.constructor.name);
   try {
     if (event instanceof MessageEvent) {
+      log1(`event.data: ${s(event.data)}`);
+      if (isMultiplexMessage(event.data)) {
+        log1("event.data is MultiplexMessage");
+        return event.data as MultiplexMessage;
+      }
       const parsed = JSON.parse(event.data);
+      log1(`parsed: ${s(parsed)}`);
       if (isMultiplexMessage(parsed)) {
+        log1("parsed is MultiplexMessage");
         return parsed as MultiplexMessage;
       }
+      log1("parsed is not MultiplexMessage");
+      log1(
+        `(event as WebSocketClientMessageEvent).data.clientEvent.data: ${
+          s((event as WebSocketClientMessageEvent).data.clientEvent.data)
+        }`,
+      );
       const parsed2 = JSON.parse(
         (event as WebSocketClientMessageEvent).data.clientEvent.data,
       );
+      log1(`parsed2: ${s(parsed2)}`);
       if (isMultiplexMessage(parsed2)) {
+        log1("parsed2 as MultiplexMessage");
         return parsed2 as MultiplexMessage;
       }
+      log1("parsed2 is not MultiplexMessage");
     }
-  } catch {
+  } catch (error) {
+    log1("error", error);
     // fall-through to error
   }
   throw new Error(`Event contained non-multiplex message: ${event}`);
