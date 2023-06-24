@@ -1,5 +1,9 @@
 import { Logger, logger } from "./log.ts";
-import { MultiplexMessage } from "./connector/mod.ts";
+
+export type MultiplexMessage = {
+  channel: string;
+  message: string;
+};
 
 /**
  * Checks if we are definitively allowed to access a given environment variable.
@@ -156,4 +160,44 @@ export function asMultiplexMessageEvent(
   return new MessageEvent(type, {
     data: JSON.stringify(multiplexMessage),
   });
+}
+
+export function asMessageEvent(
+  multiplexMessage: MultiplexMessage,
+  type = "message",
+): MessageEvent {
+  return new MessageEvent(type, {
+    data: multiplexMessage.message,
+  });
+}
+
+export function s(object: unknown): string {
+  return JSON.stringify(object);
+}
+
+export function ss(object: unknown): string {
+  return JSON.stringify(object, null, 2);
+}
+
+export function safely(fn: () => void): void {
+  try {
+    fn();
+  } catch (_ignore) {
+    // ignore
+  }
+}
+
+export function webSocketReadyState(readyState?: number): string {
+  switch (readyState) {
+    case WebSocket.CONNECTING:
+      return "CONNECTING";
+    case WebSocket.OPEN:
+      return "OPEN";
+    case WebSocket.CLOSING:
+      return "CLOSING";
+    case WebSocket.CLOSED:
+      return "CLOSED";
+    default:
+      return `UNKNOWN(${s(readyState)})`;
+  }
 }

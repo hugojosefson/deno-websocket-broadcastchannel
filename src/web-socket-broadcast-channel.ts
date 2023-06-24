@@ -1,96 +1,90 @@
 import {
-  Connector,
+  asMessageEvent,
+  extractAnyMultiplexMessage,
   MultiplexMessage,
-  NamedClosableEventTarget,
-} from "./connector/mod.ts";
-import { LoopingConnector } from "./connector/looping-connector.ts";
-import { asMultiplexMessageEvent, extractAnyMultiplexMessage } from "./fn.ts";
+  s,
+} from "./fn.ts";
 import { Logger, logger } from "./log.ts";
+import { WebSocketClientServer } from "./web-socket-client-server.ts";
 
 const log0: Logger = logger(import.meta.url);
-let connector: Connector | undefined = undefined;
+let wscs: WebSocketClientServer | undefined = undefined;
 
-function ensureConnector() {
-  const log1: Logger = log0.sub(ensureConnector.name);
-  log1("connector:", !!connector);
-  if (connector === undefined) {
-    log1("connector === undefined; creating new LoopingConnector...");
-    connector = new LoopingConnector();
+function ensureWscs() {
+  const log1: Logger = log0.sub(ensureWscs.name);
+  log1("wscs:", !!wscs);
+  if (wscs === undefined) {
+    log1("wscs === undefined; creating new WebSocketClientServer...");
+    wscs = new WebSocketClientServer();
 
-    connector.addEventListener("close", () => {
-      const log = log1.sub("connector.addEventListener('close', ...)");
-      log("connector closed; dispatching close events to channels...");
+    wscs.addEventListener("close", () => {
+      const log = log1.sub("wscs.addEventListener('close', ...)");
+      log("wscs closed; dispatching close events to channels...");
 
       for (const channelSet of channelSets.values()) {
         for (const channel of channelSet) {
           log("dispatching close event to channel:", channel.name);
           channel.dispatchEvent(new CloseEvent("close"));
-
-          log("unregistering channel:", channel.name);
-          unregisterChannel(channel);
         }
       }
 
-      log("setting connector = undefined");
-      connector = undefined;
+      log("setting wscs = undefined");
+      wscs = undefined;
     });
 
-    connector.addEventListener("error", (e: Event) => {
-      const log = log1.sub("connector.addEventListener('error', ...)");
-      log("connector error:", e);
+    wscs.addEventListener("error", (e: Event) => {
+      const log = log1.sub("wscs.addEventListener('error', ...)");
+      log("wscs error:", e);
 
       log("dispatching error events to channels...");
       for (const channelSet of channelSets.values()) {
         for (const channel of channelSet) {
           log("dispatching error event to channel:", channel.name);
           channel.dispatchEvent(new ErrorEvent("error", e));
-
-          log("unregistering channel:", channel.name);
-          unregisterChannel(channel);
         }
       }
     });
 
-    connector.addEventListener("message", (e: Event) => {
-      const log = log1.sub("connector.addEventListener('message', ...)");
-      log("connector message:", e);
+    wscs.addEventListener("message", (e: Event) => {
+      const log = log1.sub("wscs.addEventListener('message', ...)");
+      log("wscs message:", e);
       if (!(e instanceof MessageEvent)) {
         log(
-          "Unexpected non-MessageEvent from connector:",
+          "Unexpected non-MessageEvent from wscs:",
           e,
         );
         return;
       }
       const multiplexMessage: MultiplexMessage = extractAnyMultiplexMessage(e);
-      log("connector message is a MultiplexMessage:", multiplexMessage);
+      log("wscs message is a MultiplexMessage:", multiplexMessage);
       const channels: Set<WebSocketBroadcastChannel> =
         getChannelSetOrDisconnectedEmptySet(multiplexMessage.channel);
       for (const channel of channels) {
         log("dispatching message to channel:", channel.name);
-        channel.dispatchEvent(asMultiplexMessageEvent(multiplexMessage));
+        channel.dispatchEvent(asMessageEvent(multiplexMessage));
       }
     });
   }
 }
 
-function getConnector(): Connector {
-  ensureConnector();
-  return connector!;
+function getWscs(): WebSocketClientServer {
+  ensureWscs();
+  return wscs!;
 }
 
-function possiblyUnregisterConnector() {
-  const log = log0.sub(possiblyUnregisterConnector.name);
-  log("connector:", !!connector);
-  if (connector !== undefined) {
-    log("connector !== undefined; checking if it should be unregistered...");
+function possiblyUnregisterWscs() {
+  const log = log0.sub(possiblyUnregisterWscs.name);
+  log("wscs:", !!wscs);
+  if (wscs !== undefined) {
+    log("wscs !== undefined; checking if it should be unregistered...");
     log("channelSets.size:", channelSets.size);
     if (channelSets.size === 0) {
-      log("channelSets.size === 0; closing connector...");
-      connector.close();
-      log("setting connector = undefined");
-      connector = undefined;
+      log("channelSets.size === 0; closing wscs...");
+      wscs.close();
+      log("setting wscs = undefined");
+      wscs = undefined;
     } else {
-      log("channelSets.size !== 0; not closing connector.");
+      log("channelSets.size !== 0; not closing wscs.");
     }
   }
 }
@@ -101,9 +95,8 @@ function registerChannel(
   channel: WebSocketBroadcastChannel,
 ): void {
   const log = log0.sub(registerChannel.name);
-  log("channel:", channel);
 
-  ensureConnector();
+  ensureWscs();
   channel.addEventListener("close", () => {
     log(
       `channel.addEventListener('close', ...): unregistering channel ${channel?.name}...`,
@@ -119,7 +112,7 @@ function unregisterChannel(
   channel: WebSocketBroadcastChannel,
 ): void {
   const log = log0.sub(unregisterChannel.name);
-  log("channel:", channel);
+  log("channel.name:", channel.name);
   const channelSet: undefined | Set<WebSocketBroadcastChannel> = channelSets
     .get(
       channel.name,
@@ -135,7 +128,7 @@ function unregisterChannel(
     log("channelSet.size === 0; deleting channelSet:", channel.name);
     channelSets.delete(channel.name);
   }
-  possiblyUnregisterConnector();
+  possiblyUnregisterWscs();
 }
 
 function getOrCreateChannelSet(
@@ -160,19 +153,32 @@ function getChannelSetOrDisconnectedEmptySet(
   return channelSet ?? new Set();
 }
 
-export class WebSocketBroadcastChannel extends NamedClosableEventTarget {
+export class WebSocketBroadcastChannel extends EventTarget {
   private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
+  private closed = false;
+  public readonly name: string;
   constructor(name: string) {
-    super(name);
-    this.log.sub("constructor")("name:", name);
+    super();
+    this.name = name;
+    this.log.sub("constructor")(`name: ${s(name)}`);
     registerChannel(this);
   }
   postMessage(message: string): void {
     const log1 = this.log.sub("postMessage");
-    log1("message:", message);
-    this.assertNotClosed();
-    const message1 = { channel: this.name, message };
-    log1("getConnector().postMessage(message1):", message1);
-    getConnector().postMessage(message1);
+    log1(`message: ${s(message)}`);
+    if (this.closed) {
+      log1("channel is closed; not posting message.");
+      return;
+    }
+    const message1: MultiplexMessage = { channel: this.name, message };
+    log1(`getWscs().postMessage(${s(message1)})`);
+    getWscs().postMessage(message1);
+  }
+  close(): void {
+    const log1 = this.log.sub("close");
+    log1("closing channel...");
+    this.closed = true;
+    log1("dispatching close event...");
+    this.dispatchEvent(new CloseEvent("close"));
   }
 }
