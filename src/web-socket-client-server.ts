@@ -1,4 +1,8 @@
-import { WebSocketServer } from "./web-socket-server.ts";
+import {
+  WebSocketClientEvent,
+  WebSocketClientMessageEvent,
+  WebSocketServer,
+} from "./web-socket-server.ts";
 import {
   getPortNumber,
   MultiplexMessage,
@@ -47,15 +51,39 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
                 resolve();
               });
               this.wss.addEventListener("error", reject);
+
+              this.wss.addEventListener("client:open", () => {
+                log3("client:open");
+              });
+              this.wss.addEventListener("client:close", () => {
+                log3("client:close");
+              });
+
+              this.wss.addEventListener(
+                "client:message",
+                (event: WebSocketClientMessageEvent) => {
+                  log3("client:message");
+                  this.dispatchEvent(
+                    new MessageEvent("message", {
+                      data: JSON.parse(event.data.clientEvent.data),
+                    }),
+                  );
+                },
+              );
             });
           } catch (e) {
             log3(`error: ${s(e)}`);
             this.disposeServer();
           }
         }
-        log2("sleeping after server...");
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        log2("woke up after server");
+        if (this.isClosed()) {
+          log2("closed; not sleeping after server. breaking loop.");
+          break;
+        } else {
+          log2("sleeping after server...");
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          log2("woke up after server");
+        }
 
         if (this.whatAmI === "client") {
           log3 = log2.sub("client");
@@ -73,6 +101,18 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
                 this.disposeClient();
                 resolve();
               });
+              this.ws.addEventListener("message", (event: MessageEvent) => {
+                const log4: Logger = log3.sub("message");
+                log3(`event.data: ${s(event.data)}`);
+                log3(`JSON.parsing event.data...`);
+                const data = JSON.parse(event.data);
+                log3(`JSON.parsed event.data: ${s(data)}`);
+                log4(`dispatching message event...`);
+                this.dispatchEvent(
+                  new MessageEvent("message", { data }),
+                );
+                log4(`dispatched message event`);
+              });
               this.ws.addEventListener("error", reject);
             });
           } catch (e) {
@@ -80,9 +120,13 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
             this.disposeClient();
           }
         }
-        log2("sleeping after client...");
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        log2("woke up after client");
+        if (this.isClosed()) {
+          log2("closed; not sleeping after client. breaking loop.");
+        } else {
+          log2("sleeping after client...");
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          log2("woke up after client");
+        }
       }
       log2("finished");
     })();
@@ -90,10 +134,17 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
 
   private disposeClient(): void {
     const log1: Logger = log0.sub(this.disposeClient.name);
+    log1(`!!this.ws === ${s(!!this.ws)}`);
     if (this.ws) {
       const ws = this.ws;
       this.ws = undefined;
-      safely(() => ws.close());
+      safely(() => {
+        log1(`ws.readyState === ${webSocketReadyState(ws)}`);
+        log1(`closing ws...`);
+        ws.close();
+        log1(`closed ws`);
+        log1(`ws.readyState === ${webSocketReadyState(ws)}`);
+      });
     }
     if (this.whatAmI === "client") {
       log1("becoming server...");
@@ -105,10 +156,30 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
 
   private disposeServer(): void {
     const log1: Logger = log0.sub(this.disposeServer.name);
+    log1(`!!this.wss === ${s(!!this.wss)}`);
     if (this.wss) {
       const wss = this.wss;
       this.wss = undefined;
-      safely(() => wss.close());
+      safely(() => {
+        log1(`wss.isListening() === ${s(wss.isListening())}`);
+        log1(`wss.clients.size === ${s(wss.clients.size)}`);
+        for (const client of wss.clients) {
+          safely(() => {
+            log1(`client.readyState === ${webSocketReadyState(client)}`);
+            log1(`closing client...`);
+            client.close();
+            log1(`closed client`);
+            log1(`client.readyState === ${webSocketReadyState(client)}`);
+          });
+        }
+      });
+      safely(() => {
+        log1(`wss.isListening() === ${s(wss.isListening())}`);
+        log1(`closing wss...`);
+        wss.close();
+        log1(`closed wss`);
+        log1(`wss.isListening() === ${s(wss.isListening())}`);
+      });
     }
     if (this.whatAmI === "server") {
       log1("becoming client...");

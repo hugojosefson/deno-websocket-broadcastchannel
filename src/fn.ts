@@ -1,4 +1,5 @@
 import { Logger, logger } from "./log.ts";
+import { WebSocketClientMessageEvent } from "./web-socket-server.ts";
 
 export type MultiplexMessage = {
   channel: string;
@@ -145,6 +146,12 @@ export function extractAnyMultiplexMessage(event: Event): MultiplexMessage {
       const parsed = JSON.parse(event.data);
       if (isMultiplexMessage(parsed)) {
         return parsed as MultiplexMessage;
+      }
+      const parsed2 = JSON.parse(
+        (event as WebSocketClientMessageEvent).data.clientEvent.data,
+      );
+      if (isMultiplexMessage(parsed2)) {
+        return parsed2 as MultiplexMessage;
       }
     }
   } catch {

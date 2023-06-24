@@ -47,7 +47,6 @@ function ensureWscs() {
 
     wscs.addEventListener("message", (e: Event) => {
       const log = log1.sub("wscs.addEventListener('message', ...)");
-      log("wscs message:", e);
       if (!(e instanceof MessageEvent)) {
         log(
           "Unexpected non-MessageEvent from wscs:",
@@ -61,7 +60,7 @@ function ensureWscs() {
         getChannelSetOrDisconnectedEmptySet(multiplexMessage.channel);
       for (const channel of channels) {
         log("dispatching message to channel:", channel.name);
-        channel.dispatchEvent(asMessageEvent(multiplexMessage));
+        channel.dispatchEvent(new MessageEvent("message", {data: multiplexMessage.message}));
       }
     });
   }
