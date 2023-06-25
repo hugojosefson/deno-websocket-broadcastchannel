@@ -34,7 +34,7 @@ An example chat application, that you can run in several terminals on the same
 host, and see the messages broadcast between them.
 
 This uses the
-[createBroadcastChannel](https://deno.land/x/websocket_broadcastchannel?doc#createbroadcastchannel)
+[createBroadcastChannel](https://deno.land/x/websocket_broadcastchannel/mod.ts?s=createBroadcastChannel)
 function to create the relevant `BroadcastChannel` object, and then uses the
 `BroadcastChannel` API as usual.
 
