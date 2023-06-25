@@ -10,6 +10,26 @@ import { DEFAULT_WEBSOCKET_URL } from "./default-websocket-url.ts";
 
 const log0: Logger = logger(import.meta.url);
 
+/**
+ * Use this the same way you would use {@link BroadcastChannel} on Deno Deploy,
+ * it has the same API, but on a host that is not Deno Deploy.
+ *
+ * Instead of connecting all instances of the same app together like on Deno
+ * Deploy, this implementation uses a {@link WebSocket} to communicate with
+ * other instances of this class in the same or other processes, on the same
+ * host.
+ *
+ * Will try to act as a WebSocket server, if no other instance of this class is
+ * running on the same host yet. Otherwise, will act as a WebSocket client and
+ * connect to the server. Will reconnect and switch roles as needed, if the
+ * instance that happens to be the server goes down.
+ *
+ * When no instances of this class are running in this process (none created
+ * yet, or all closed), it stays disconnected. When at least one instance is
+ * created, it will keep doing its best to stay connected.
+ *
+ * @see {@link https://deno.com/deploy/docs/runtime-broadcast-channel}
+ */
 export class WebSocketBroadcastChannel extends EventTarget
   implements BroadcastChannelIsh {
   private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);

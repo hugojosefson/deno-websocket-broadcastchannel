@@ -6,7 +6,7 @@ import {
 } from "./types.ts";
 
 /**
- * Creates a BroadcastChannel or WebSocketBroadcastChannel, depending on
+ * Creates a {@link BroadcastChannel} or {@link WebSocketBroadcastChannel}, depending on
  * whether we are running on Deno Deploy or not.
  * @param name The name of the channel.
  */

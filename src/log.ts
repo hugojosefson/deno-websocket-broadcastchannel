@@ -2,7 +2,14 @@ import { basename, extname } from "https://deno.land/std@0.192.0/path/mod.ts";
 import type { Debug } from "https://deno.land/x/quiet_debug@v1.0.0/mod.ts";
 import { debug } from "https://deno.land/x/quiet_debug@v1.0.0/mod.ts";
 
+/**
+ * A {@link https://deno.land/x/quiet_debug} logger, with an extra method to create labelled sub-loggers.
+ */
 export interface Logger extends Debug {
+  /**
+   * Creates a sub-logger, with an extra label prefixed to all messages.
+   * @param label The label to prefix to all messages.
+   */
   sub(label: string): Logger;
 }
 
@@ -14,8 +21,8 @@ function isFileUrl(url: string): url is FileUrl {
 
 function calculateLabel(labelOrMetaImportUrl: string): string {
   if (isFileUrl(labelOrMetaImportUrl)) {
-    const url = labelOrMetaImportUrl;
-    const ext = extname(url);
+    const url: FileUrl = labelOrMetaImportUrl;
+    const ext: string = extname(url);
     return basename(url, ext);
   }
   return labelOrMetaImportUrl;
@@ -29,6 +36,11 @@ function countLabel(label: string): number {
   return count;
 }
 
+/**
+ * Creates a logger with a label. Can extract relevant label from {@link import.meta.url} if supplied.
+ * @param labelOrMetaImportUrl The label, or the `import.meta.url` of the module.
+ * @returns A {@link Logger}.
+ */
 export function logger(labelOrMetaImportUrl: string): Logger {
   const label = calculateLabel(labelOrMetaImportUrl);
   return Object.assign(

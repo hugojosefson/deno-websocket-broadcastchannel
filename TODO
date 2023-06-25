@@ -1,5 +1,4 @@
-TODO: WebSocketBroadcastChannel to support custom port number
 TODO: WebSocketBroadcastChannel to support custom url
-TODO: chat.ts to support user's choice of channel name
+TODO: WebSocketBroadcastChannel to support custom port number
 TODO: test with more than one channel per process (same name)
 TODO: test with more than one channel per process (different names)
