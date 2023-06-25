@@ -1,20 +1,64 @@
-import { extractAnyMultiplexMessage, MultiplexMessage, s } from "./fn.ts";
+import { s } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
 import { WebSocketClientServer } from "./web-socket-client-server.ts";
+import {
+  extractAnyMultiplexMessage,
+  MultiplexMessage,
+} from "./multiplex-message.ts";
+import { BroadcastChannelIsh } from "./types.ts";
 
 const log0: Logger = logger(import.meta.url);
-let wscs: WebSocketClientServer | undefined = undefined;
 
-function ensureWscs() {
-  const log1: Logger = log0.sub(ensureWscs.name);
-  log1("wscs:", !!wscs);
-  if (wscs === undefined) {
-    log1("wscs === undefined; creating new WebSocketClientServer...");
-    wscs = new WebSocketClientServer();
+export class WebSocketBroadcastChannel extends EventTarget
+  implements BroadcastChannelIsh {
+  private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
+  private closed = false;
+  public readonly name: string;
+  constructor(name: string) {
+    super();
+    this.name = name;
+    this.log.sub("constructor")(`name: ${s(name)}`);
+    registerChannel(this);
+  }
+  postMessage(message: string): void {
+    const log1 = this.log.sub("postMessage");
+    log1(`message: ${s(message)}`);
+    if (this.closed) {
+      log1("channel is closed; not posting message.");
+      return;
+    }
+    const message1: MultiplexMessage = { channel: this.name, message };
+    const message2: string = JSON.stringify(message1);
+    log1(`getClientServer().postMessage(${s(message2)})`);
+    getClientServer().postMessage(message2);
+  }
+  close(): void {
+    const log1 = this.log.sub("close");
+    log1("closing channel...");
+    this.closed = true;
+    log1("dispatching close event...");
+    this.dispatchEvent(new CloseEvent("close"));
+  }
+}
 
-    wscs.addEventListener("close", () => {
-      const log = log1.sub("wscs.addEventListener('close', ...)");
-      log("wscs closed; dispatching close events to channels...");
+const channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
+let clientServer: WebSocketClientServer | undefined = undefined;
+
+function getClientServer(): WebSocketClientServer {
+  ensureClientServer();
+  return clientServer!;
+}
+
+function ensureClientServer() {
+  const log1: Logger = log0.sub(ensureClientServer.name);
+  log1("clientServer:", !!clientServer);
+  if (clientServer === undefined) {
+    log1("clientServer === undefined; creating new WebSocketClientServer...");
+    clientServer = new WebSocketClientServer();
+
+    clientServer.addEventListener("close", () => {
+      const log = log1.sub("clientServer.addEventListener('close', ...)");
+      log("clientServer closed; dispatching close events to channels...");
 
       for (const channelSet of channelSets.values()) {
         for (const channel of channelSet) {
@@ -23,13 +67,13 @@ function ensureWscs() {
         }
       }
 
-      log("setting wscs = undefined");
-      wscs = undefined;
+      log("setting clientServer = undefined");
+      clientServer = undefined;
     });
 
-    wscs.addEventListener("error", (e: Event) => {
-      const log = log1.sub("wscs.addEventListener('error', ...)");
-      log("wscs error:", e);
+    clientServer.addEventListener("error", (e: Event) => {
+      const log = log1.sub("clientServer.addEventListener('error', ...)");
+      log("clientServer error:", e);
 
       log("dispatching error events to channels...");
       for (const channelSet of channelSets.values()) {
@@ -40,17 +84,17 @@ function ensureWscs() {
       }
     });
 
-    wscs.addEventListener("message", (e: Event) => {
-      const log = log1.sub("wscs.addEventListener('message', ...)");
+    clientServer.addEventListener("message", (e: Event) => {
+      const log = log1.sub("clientServer.addEventListener('message', ...)");
       if (!(e instanceof MessageEvent)) {
         log(
-          "Unexpected non-MessageEvent from wscs:",
+          "Unexpected non-MessageEvent from clientServer:",
           e,
         );
         return;
       }
       const multiplexMessage: MultiplexMessage = extractAnyMultiplexMessage(e);
-      log("wscs message is a MultiplexMessage:", multiplexMessage);
+      log("clientServer message is a MultiplexMessage:", multiplexMessage);
       const channels: Set<WebSocketBroadcastChannel> =
         getChannelSetOrDisconnectedEmptySet(multiplexMessage.channel);
       for (const channel of channels) {
@@ -63,36 +107,12 @@ function ensureWscs() {
   }
 }
 
-function getWscs(): WebSocketClientServer {
-  ensureWscs();
-  return wscs!;
-}
-
-function possiblyUnregisterWscs() {
-  const log = log0.sub(possiblyUnregisterWscs.name);
-  log("wscs:", !!wscs);
-  if (wscs !== undefined) {
-    log("wscs !== undefined; checking if it should be unregistered...");
-    log("channelSets.size:", channelSets.size);
-    if (channelSets.size === 0) {
-      log("channelSets.size === 0; closing wscs...");
-      wscs.close();
-      log("setting wscs = undefined");
-      wscs = undefined;
-    } else {
-      log("channelSets.size !== 0; not closing wscs.");
-    }
-  }
-}
-
-const channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
-
 function registerChannel(
   channel: WebSocketBroadcastChannel,
 ): void {
   const log = log0.sub(registerChannel.name);
 
-  ensureWscs();
+  ensureClientServer();
   channel.addEventListener("close", () => {
     log(
       `channel.addEventListener('close', ...): unregistering channel ${channel?.name}...`,
@@ -124,7 +144,24 @@ function unregisterChannel(
     log("channelSet.size === 0; deleting channelSet:", channel.name);
     channelSets.delete(channel.name);
   }
-  possiblyUnregisterWscs();
+  possiblyUnregisterClientServer();
+}
+
+function possiblyUnregisterClientServer() {
+  const log = log0.sub(possiblyUnregisterClientServer.name);
+  log("clientServer:", !!clientServer);
+  if (clientServer !== undefined) {
+    log("clientServer !== undefined; checking if it should be unregistered...");
+    log("channelSets.size:", channelSets.size);
+    if (channelSets.size === 0) {
+      log("channelSets.size === 0; closing clientServer...");
+      clientServer.close();
+      log("setting clientServer = undefined");
+      clientServer = undefined;
+    } else {
+      log("channelSets.size !== 0; not closing clientServer.");
+    }
+  }
 }
 
 function getOrCreateChannelSet(
@@ -147,35 +184,4 @@ function getChannelSetOrDisconnectedEmptySet(
   const channelSet = channelSets.get(name);
   log("channelSet:", channelSet);
   return channelSet ?? new Set();
-}
-
-export class WebSocketBroadcastChannel extends EventTarget {
-  private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
-  private closed = false;
-  public readonly name: string;
-  constructor(name: string) {
-    super();
-    this.name = name;
-    this.log.sub("constructor")(`name: ${s(name)}`);
-    registerChannel(this);
-  }
-  postMessage(message: string): void {
-    const log1 = this.log.sub("postMessage");
-    log1(`message: ${s(message)}`);
-    if (this.closed) {
-      log1("channel is closed; not posting message.");
-      return;
-    }
-    const message1: MultiplexMessage = { channel: this.name, message };
-    const message2: string = JSON.stringify(message1);
-    log1(`getWscs().postMessage(${s(message2)})`);
-    getWscs().postMessage(message2);
-  }
-  close(): void {
-    const log1 = this.log.sub("close");
-    log1("closing channel...");
-    this.closed = true;
-    log1("dispatching close event...");
-    this.dispatchEvent(new CloseEvent("close"));
-  }
 }

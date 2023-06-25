@@ -2,17 +2,18 @@ import {
   WebSocketClientMessageEvent,
   WebSocketServer,
 } from "./web-socket-server.ts";
-import { getPortNumber, s, safely, webSocketReadyState } from "./fn.ts";
+import { getPortNumber, s, safely, sleep, webSocketReadyState } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export type WhatAmI =
+type WhatAmI =
   | "server"
   | "client"
   | "closed";
 
 export const DEFAULT_WEBSOCKET_URL = new URL("ws://localhost:51799");
+const SLEEP_DURATION_MS = 50;
 
 export class WebSocketClientServer extends EventTarget implements Deno.Closer {
   private readonly log1: Logger = log0.sub(WebSocketClientServer.name);
@@ -93,7 +94,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
           break;
         } else {
           log2("sleeping after server...");
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await sleep(SLEEP_DURATION_MS);
           log2("woke up after server");
         }
 
@@ -136,7 +137,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
           log2("closed; not sleeping after client. breaking loop.");
         } else {
           log2("sleeping after client...");
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await sleep(SLEEP_DURATION_MS);
           log2("woke up after client");
         }
       }

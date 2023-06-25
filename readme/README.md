@@ -27,38 +27,21 @@ Please see the
 
 ## Example usage
 
+An example chat application, where each client is a separate process, and the
+server is a separate process:
+
 ```typescript
-"@@include(./example-usage.ts)";
+"@@include(./chat.ts)";
 ```
 
-You may run the above example with:
+To run the above example:
 
 ```sh
-DEBUG='*' deno run --allow-env=DEBUG --reload --allow-net https://deno.land/x/websocket-broadcastchannel/readme/example-usage.ts
+deno run --reload --allow-net https://deno.land/x/websocket-broadcastchannel/readme/chat.ts
 ```
 
-For further usage examples, see the tests:
+If you want to see all the debug output:
 
-- [test/websocket-broadcastchannel.test.ts](test/websocket-broadcastchannel.test.ts)
-
-## Events
-
-Shows the components of this implementation, the events that are emitted, and
-where they go.
-
-### Components
-
-- `WebSocketBroadcastChannel` is the main class, that you use to create a
-  channel.
-- `Server` is a `Connector` that attempts to listen for incoming WebSocket
-  connections from `Client`s.
-- `Client` is a `Connector` that attempts to connect to the `Server`.
-- `LoopingConnector` is a `Connector` that attempts to use a `Server` and
-  `Client` to get connected, and keeps trying until it succeeds, alternating
-  between trying to be a `Server` and a `Client`.
-
-### Events
-
-```plantuml
-'@@include(./events-connector.puml)
+```sh
+DEBUG='*' deno run --allow-env=DEBUG --reload --allow-net https://deno.land/x/websocket-broadcastchannel/readme/chat.ts
 ```

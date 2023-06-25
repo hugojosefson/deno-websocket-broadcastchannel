@@ -3,17 +3,17 @@ import { Logger, logger } from "./log.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export interface WebSocketEventData<E extends Event> {
+interface WebSocketEventData<E extends Event> {
   ws: WebSocket;
   url: string;
   clientEvent: E;
 }
 
-export interface WebSocketEvent extends Event {
+interface WebSocketEvent extends Event {
   data: WebSocketEventData<Event>;
 }
 
-export class WebSocketClientEvent<
+class WebSocketClientEvent<
   T extends
     | "client:open"
     | "client:close"
