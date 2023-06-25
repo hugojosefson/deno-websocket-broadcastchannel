@@ -4,5 +4,9 @@ export { polyfillBroadcastChannel } from "./src/polyfill.ts";
 export { isDenoDeploy } from "./src/fn.ts";
 export { logger } from "./src/log.ts";
 export type { Logger } from "./src/log.ts";
-export type { BroadcastChannelIsh } from "./src/types.ts";
-export { DEFAULT_WEBSOCKET_URL } from "./src/web-socket-client-server.ts";
+export type {
+  BroadcastChannelIsh,
+  GlobalThisWithBroadcastChannel,
+} from "./src/types.ts";
+
+export { DEFAULT_WEBSOCKET_URL } from "./src/default-websocket-url.ts";

@@ -12,7 +12,6 @@ type WhatAmI =
   | "client"
   | "closed";
 
-export const DEFAULT_WEBSOCKET_URL = new URL("ws://localhost:51799");
 const SLEEP_DURATION_MS = 50;
 
 export class WebSocketClientServer extends EventTarget implements Deno.Closer {
@@ -23,7 +22,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
   private outgoingMessages: string[] = [];
 
   constructor(
-    private readonly url: URL = DEFAULT_WEBSOCKET_URL,
+    private readonly url: URL,
   ) {
     super();
     const log2: Logger = this.log1.sub("constructor");

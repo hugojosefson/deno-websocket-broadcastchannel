@@ -6,6 +6,7 @@ import {
   MultiplexMessage,
 } from "./multiplex-message.ts";
 import { BroadcastChannelIsh } from "./types.ts";
+import { DEFAULT_WEBSOCKET_URL } from "./default-websocket-url.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -14,9 +15,11 @@ export class WebSocketBroadcastChannel extends EventTarget
   private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
   private closed = false;
   public readonly name: string;
-  constructor(name: string) {
+  readonly url: URL;
+  constructor(name: string, url: URL = new URL(DEFAULT_WEBSOCKET_URL)) {
     super();
     this.name = name;
+    this.url = url;
     this.log.sub("constructor")(`name: ${s(name)}`);
     registerChannel(this);
   }
@@ -30,7 +33,7 @@ export class WebSocketBroadcastChannel extends EventTarget
     const message1: MultiplexMessage = { channel: this.name, message };
     const message2: string = JSON.stringify(message1);
     log1(`getClientServer().postMessage(${s(message2)})`);
-    getClientServer().postMessage(message2);
+    getClientServer(this.url).postMessage(message2);
   }
   close(): void {
     const log1 = this.log.sub("close");
@@ -44,17 +47,17 @@ export class WebSocketBroadcastChannel extends EventTarget
 const channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
 let clientServer: WebSocketClientServer | undefined = undefined;
 
-function getClientServer(): WebSocketClientServer {
-  ensureClientServer();
+function getClientServer(url: URL): WebSocketClientServer {
+  ensureClientServer(url);
   return clientServer!;
 }
 
-function ensureClientServer() {
+function ensureClientServer(url: URL): void {
   const log1: Logger = log0.sub(ensureClientServer.name);
   log1("clientServer:", !!clientServer);
   if (clientServer === undefined) {
     log1("clientServer === undefined; creating new WebSocketClientServer...");
-    clientServer = new WebSocketClientServer();
+    clientServer = new WebSocketClientServer(url);
 
     clientServer.addEventListener("close", () => {
       const log = log1.sub("clientServer.addEventListener('close', ...)");
@@ -112,7 +115,7 @@ function registerChannel(
 ): void {
   const log = log0.sub(registerChannel.name);
 
-  ensureClientServer();
+  ensureClientServer(channel.url);
   channel.addEventListener("close", () => {
     log(
       `channel.addEventListener('close', ...): unregistering channel ${channel?.name}...`,

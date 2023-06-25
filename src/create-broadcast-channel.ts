@@ -2,7 +2,7 @@ import { isDenoDeploy } from "./fn.ts";
 import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
 import {
   BroadcastChannelIsh,
-  GlobalThisWithBroadcastChannelIsh,
+  GlobalThisWithBroadcastChannel,
 } from "./types.ts";
 
 /**
@@ -14,7 +14,7 @@ export async function createBroadcastChannel(
   name: string,
 ): Promise<BroadcastChannelIsh> {
   if (await isDenoDeploy()) {
-    const g = globalThis as GlobalThisWithBroadcastChannelIsh;
+    const g = globalThis as GlobalThisWithBroadcastChannel;
     return new g.BroadcastChannel(name);
   }
 
