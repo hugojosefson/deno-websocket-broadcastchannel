@@ -38,8 +38,9 @@ the others will take over that duty, and the rest will reconnect to it.
 Running on Deno Deploy. Application-wide BroadcastChannel is fully supported,
 so you don't need WebSocketBroadcastChannel!
 
-(It makes little sense to use stdin on Deno Deploy, so this example is only
-useful on Deno Deploy, for seeing this detection in your logs :)
+(However, it makes little sense to read from stdin on Deno Deploy, so this
+example CLI-based chat app is only useful on Deno Deploy, for seeing this
+detection in your logs :)
 ===============================================================================
 `);
   }

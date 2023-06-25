@@ -6,7 +6,7 @@ for Deno, that uses
 [WebSocket](https://developer.mozilla.org/docs/Web/API/WebSocket)s to
 communicate between processes on the same host.
 
-[![deno.land/x/websocket-broadcastchannel](https://shield.deno.dev/x/websocket-broadcastchannel)](https://deno.land/x/websocket-broadcastchannel)
+[![deno.land/x/websocket_broadcastchannel](https://shield.deno.dev/x/websocket_broadcastchannel)](https://deno.land/x/websocket_broadcastchannel)
 [![CI](https://github.com/hugojosefson/deno-websocket-broadcastchannel/actions/workflows/ci.yaml/badge.svg)](https://github.com/hugojosefson/deno-websocket-broadcastchannel/actions/workflows/ci.yaml)
 
 While
@@ -22,13 +22,21 @@ Requires a recent version of [Deno](https://deno.land/).
 
 ## API
 
-Please see the
-[auto-generated API documentation](https://deno.land/x/websocket-broadcastchannel?doc).
+Please see MDN's documentation of the
+[BroadcastChannel API](https://developer.mozilla.org/docs/Web/API/BroadcastChannel).
+
+For specifics on what's `export`ed from this module, see our
+[auto-generated API documentation](https://deno.land/x/websocket_broadcastchannel?doc).
 
 ## Example usage
 
-An example chat application, where each client is a separate process, and the
-server is a separate process:
+An example chat application, that you can run in several terminals on the same
+host, and see the messages broadcast between them.
+
+This uses the
+[createBroadcastChannel](https://deno.land/x/websocket_broadcastchannel?doc#createbroadcastchannel)
+function to create the relevant `BroadcastChannel` object, and then uses the
+`BroadcastChannel` API as usual.
 
 ```typescript
 import {
@@ -37,7 +45,7 @@ import {
   Logger,
   logger,
   WebSocketBroadcastChannel,
-} from "https://deno.land/x/websocket-broadcastchannel/mod.ts";
+} from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
 const log: Logger = logger(import.meta.url);
 
 /**
@@ -70,8 +78,9 @@ the others will take over that duty, and the rest will reconnect to it.
 Running on Deno Deploy. Application-wide BroadcastChannel is fully supported,
 so you don't need WebSocketBroadcastChannel!
 
-(It makes little sense to use stdin on Deno Deploy, so this example is only
-useful on Deno Deploy, for seeing this detection in your logs :)
+(However, it makes little sense to read from stdin on Deno Deploy, so this
+example CLI-based chat app is only useful on Deno Deploy, for seeing this
+detection in your logs :)
 ===============================================================================
 `);
   }
@@ -114,11 +123,11 @@ if (import.meta.main) {
 To run the above example:
 
 ```sh
-deno run --reload --allow-net https://deno.land/x/websocket-broadcastchannel/readme/chat.ts
+deno run --reload --allow-net https://deno.land/x/websocket_broadcastchannel/readme/chat.ts
 ```
 
 If you want to see all the debug output:
 
 ```sh
-DEBUG='*' deno run --allow-env=DEBUG --reload --allow-net https://deno.land/x/websocket-broadcastchannel/readme/chat.ts
+DEBUG='*' deno run --allow-env=DEBUG --reload --allow-net https://deno.land/x/websocket_broadcastchannel/readme/chat.ts
 ```
