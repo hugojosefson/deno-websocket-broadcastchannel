@@ -39,17 +39,17 @@ function to create the relevant `BroadcastChannel` object, and then uses the
 `BroadcastChannel` API as usual.
 
 ```typescript
-"@@include(./chat.ts)";
+"@@include(../examples/chat.ts)";
 ```
 
 To run the above example:
 
 ```sh
-deno run --reload --allow-net https://deno.land/x/websocket_broadcastchannel/readme/chat.ts
+deno run --reload --allow-net https://deno.land/x/websocket_broadcastchannel/examples/chat.ts
 ```
 
 If you want to see all the debug output:
 
 ```sh
-DEBUG='*' deno run --allow-env=DEBUG --reload --allow-net https://deno.land/x/websocket_broadcastchannel/readme/chat.ts
+DEBUG='*' deno run --allow-env=DEBUG --reload --allow-net https://deno.land/x/websocket_broadcastchannel/examples/chat.ts
 ```
