@@ -1,4 +1,3 @@
-TODO: support .onmessage etc
 TODO: WebSocketBroadcastChannel to support custom url
 TODO: WebSocketBroadcastChannel to support custom port number
 TODO: test with more than one channel per process (same name)
