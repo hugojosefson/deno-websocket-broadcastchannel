@@ -10,11 +10,14 @@ communicate between processes on the same host.
 [![CI](https://github.com/hugojosefson/deno-websocket-broadcastchannel/actions/workflows/ci.yaml/badge.svg)](https://github.com/hugojosefson/deno-websocket-broadcastchannel/actions/workflows/ci.yaml)
 
 While
-[BroadcastChannel is already supported in Deno Deploy](https://deno.com/deploy/docs/runtime-broadcast-channel),
-if you want to test your code locally, this module with a WebSocket-backed
-BroadcastChannel may be useful. At least until Deno will
+[BroadcastChannel is already supported in Deno Deploy](https://deno.com/deploy/docs/runtime-broadcast-channel)...
+
+If you want to test your code locally, this module with a WebSocket-backed
+BroadcastChannel, will let you do so.
+
+(At least until Deno will
 [Support cross process BroadcastChannel #10750](https://github.com/denoland/deno/issues/10750)
-in the `deno` CLI.
+in the `deno` CLI itself.)
 
 ## Requirements
 
@@ -22,13 +25,147 @@ Requires a recent version of [Deno](https://deno.land/).
 
 ## API
 
-Please see MDN's documentation of the
-[BroadcastChannel API](https://developer.mozilla.org/docs/Web/API/BroadcastChannel).
+For details on BroadcastChannel, please see:
 
-For specifics on what's `export`ed from this module, see our
-[auto-generated API documentation](https://deno.land/x/websocket_broadcastchannel?doc).
+- MDN's API documentation at
+  [developer.mozilla.org/docs/Web/API/BroadcastChannel](https://developer.mozilla.org/docs/Web/API/BroadcastChannel).
+- Deno Deploy's documentation at
+  [deno.com/deploy/docs/runtime-broadcast-channel](https://deno.com/deploy/docs/runtime-broadcast-channel).
+
+For specifics on what this module `export`s, see the auto-generated API docs at
+[deno.land/x/websocket_broadcastchannel?doc](https://deno.land/x/websocket_broadcastchannel?doc).
 
 ## Example usage
+
+Instead of using the built-in `BroadcastChannel` constructor, use this module's
+`createBroadcastChannel(name)` function.
+
+It will either:
+
+- return a `BroadcastChannel` object if available (when running in Deno Deploy),
+  or
+- return a `WebSocketBroadcastChannel` object (when running in Deno CLI).
+
+```typescript
+import { createBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
+
+const channel = await createBroadcastChannel("my-channel");
+// Now use the channel as usual.
+```
+
+### Simple broadcast between processes
+
+A small example, that you can run in several terminals on the same host, and see
+messages broadcast between them.
+
+This uses this module's
+[createBroadcastChannel(name)](https://deno.land/x/websocket_broadcastchannel/mod.ts?s=createBroadcastChannel)
+function to create the relevant `BroadcastChannel` object, and then uses the
+`BroadcastChannel` API as usual.
+
+```typescript
+import { createBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
+
+const pid = Deno.pid;
+const pidLastDigit = pid % 10;
+const delay = pidLastDigit * 1000;
+
+const log = (s: string, ...args: unknown[]) => {
+  console.log(`[broadcast.ts#${pid}] ${s}`, ...args);
+};
+
+log("run this in multiple terminals on the same host, to see it work");
+
+log("starting...");
+const testChannel = await createBroadcastChannel("test");
+log("testChannel.constructor.name", testChannel.constructor.name);
+
+testChannel.onmessage = (event: MessageEvent<unknown>) => {
+  log("onmessage event.data =", event.data);
+};
+
+testChannel.onmessageerror = (event: Event) => {
+  log("onmessageerror event =", event);
+};
+
+setInterval(() => {
+  log("posting...");
+  testChannel.postMessage(`hello from ${pid}`);
+  log("posted");
+  log(`waiting ${delay / 1000}s...`);
+}, delay);
+```
+
+To run the above example:
+
+```sh
+deno run    \
+  --reload   \
+  --allow-net \
+  https://deno.land/x/websocket_broadcastchannel/examples/broadcast.ts
+```
+
+### Server example from Deno Deploy docs
+
+This is the example from Deno Deploy's documentation page for BroadcastChannel,
+but now using this module's `await createBroadcastChannel(name)` instead of the
+built-in `new BroadcastChannel(name)`.
+
+Original:
+
+https://deno.com/deploy/docs/runtime-broadcast-channel#example
+
+Adapted to use this module:
+
+```typescript
+import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
+import { createBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
+
+const messages: string[] = [];
+// Create a new broadcast channel named earth.
+const channel = await createBroadcastChannel("earth");
+// Set onmessage event handler.
+channel.onmessage = (event: MessageEvent) => {
+  // Update the local state when other instances
+  // send us a new message.
+  messages.push(event.data);
+};
+
+function handler(req: Request): Response {
+  const { pathname, searchParams } = new URL(req.url);
+
+  // Handle /send?message=<message> endpoint.
+  if (pathname.startsWith("/send")) {
+    const message = searchParams.get("message");
+    if (!message) {
+      return new Response("?message not provided", { status: 400 });
+    }
+
+    // Update local state.
+    messages.push(message);
+    // Inform all other active instances of the deployment
+    // about the new message.
+    channel.postMessage(message);
+    return new Response("message sent");
+  }
+
+  // Handle /messages request.
+  if (pathname.startsWith("/messages")) {
+    return new Response(
+      JSON.stringify(messages),
+      {
+        headers: { "content-type": "application/json" },
+      },
+    );
+  }
+
+  return new Response("not found", { status: 404 });
+}
+
+serve(handler, { port: parseInt(Deno.env.get("PORT") ?? "8080", 10) });
+```
+
+### Chat application
 
 An example chat application, that you can run in several terminals on the same
 host, and see the messages broadcast between them.
@@ -123,11 +260,19 @@ if (import.meta.main) {
 To run the above example:
 
 ```sh
-deno run --reload --allow-net https://deno.land/x/websocket_broadcastchannel/examples/chat.ts
+deno run    \
+  --reload   \
+  --allow-net \
+  https://deno.land/x/websocket_broadcastchannel/examples/chat.ts
 ```
 
 If you want to see all the debug output:
 
 ```sh
-DEBUG='*' deno run --allow-env=DEBUG --reload --allow-net https://deno.land/x/websocket_broadcastchannel/examples/chat.ts
+DEBUG='*'       \
+deno run         \
+  --reload        \
+  --allow-net      \
+  --allow-env=DEBUG \
+  https://deno.land/x/websocket_broadcastchannel/examples/chat.ts
 ```
