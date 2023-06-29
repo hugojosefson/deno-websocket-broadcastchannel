@@ -1,8 +1,11 @@
 import { IdUrl } from "./id-url.ts";
 
 /**
- * The default websocket URL to use if none is provided. Clients will connect to
- * this URL by default, and the server will listen on the port specified by this
- * URL by default.
+ * Returns the websocket URL to use. Clients will connect to
+ * this URL, and the server will listen on the port specified by this
+ * URL.
+ * @param port The port to use. Defaults to 51799.
  */
-export const DEFAULT_WEBSOCKET_URL = IdUrl.of("ws://localhost:51799");
+export function defaultWebSocketUrl(port = 51799): IdUrl {
+  return IdUrl.of(`ws://localhost:${port}`);
+}

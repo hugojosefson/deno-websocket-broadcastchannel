@@ -6,7 +6,7 @@ import {
   MultiplexMessage,
 } from "./multiplex-message.ts";
 import { BroadcastChannelIsh } from "./types.ts";
-import { DEFAULT_WEBSOCKET_URL } from "./default-websocket-url.ts";
+import { defaultWebSocketUrl } from "./default-websocket-url.ts";
 import { IdUrl } from "./id-url.ts";
 
 const log0: Logger = logger(import.meta.url);
@@ -39,7 +39,13 @@ export class WebSocketBroadcastChannel extends EventTarget
   private closed = false;
   public readonly name: string;
   readonly url: IdUrl;
-  constructor(name: string, url: IdUrl | URL | string = DEFAULT_WEBSOCKET_URL) {
+
+  /**
+   * Creates a {@link WebSocketBroadcastChannel}.
+   * @param name The name of the channel.
+   * @param url WebSocket url to connect to or listen as. Defaults to {@link defaultWebSocketUrl}() if not specified.
+   */
+  constructor(name: string, url: IdUrl | URL | string = defaultWebSocketUrl()) {
     super();
     this.log.sub("constructor")(`name: ${s(name)}`);
     this.name = name;

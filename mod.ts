@@ -8,4 +8,4 @@ export type {
   GlobalThisWithBroadcastChannel,
 } from "./src/types.ts";
 
-export { DEFAULT_WEBSOCKET_URL } from "./src/default-websocket-url.ts";
+export { defaultWebSocketUrl } from "./src/default-websocket-url.ts";
