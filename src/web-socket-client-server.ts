@@ -4,6 +4,7 @@ import {
 } from "./web-socket-server.ts";
 import { getPortNumber, s, safely, sleep, webSocketReadyState } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
+import { IdUrl } from "./id-url.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -22,7 +23,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
   private outgoingMessages: string[] = [];
 
   constructor(
-    private readonly url: URL,
+    private readonly url: IdUrl,
   ) {
     super();
     const log2: Logger = this.log1.sub("constructor");

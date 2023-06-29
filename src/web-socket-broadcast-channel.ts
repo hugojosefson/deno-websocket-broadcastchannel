@@ -7,6 +7,7 @@ import {
 } from "./multiplex-message.ts";
 import { BroadcastChannelIsh } from "./types.ts";
 import { DEFAULT_WEBSOCKET_URL } from "./default-websocket-url.ts";
+import { IdUrl } from "./id-url.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -37,12 +38,12 @@ export class WebSocketBroadcastChannel extends EventTarget
   private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
   private closed = false;
   public readonly name: string;
-  readonly url: URL;
-  constructor(name: string, url: URL = new URL(DEFAULT_WEBSOCKET_URL)) {
+  readonly url: IdUrl;
+  constructor(name: string, url: IdUrl | URL | string = DEFAULT_WEBSOCKET_URL) {
     super();
     this.log.sub("constructor")(`name: ${s(name)}`);
     this.name = name;
-    this.url = url;
+    this.url = IdUrl.of(url);
     this.addEventListener("message", (e: Event) => this.onmessage?.(e));
     this.addEventListener(
       "messageerror",
@@ -75,12 +76,12 @@ export class WebSocketBroadcastChannel extends EventTarget
 const channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
 let clientServer: WebSocketClientServer | undefined = undefined;
 
-function getClientServer(url: URL): WebSocketClientServer {
+function getClientServer(url: IdUrl): WebSocketClientServer {
   ensureClientServer(url);
   return clientServer!;
 }
 
-function ensureClientServer(url: URL): void {
+function ensureClientServer(url: IdUrl): void {
   const log1: Logger = log0.sub(ensureClientServer.name);
   log1("clientServer:", !!clientServer);
   if (clientServer === undefined) {
