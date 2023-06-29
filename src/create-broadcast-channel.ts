@@ -15,7 +15,7 @@ export async function createBroadcastChannel(
 ): Promise<BroadcastChannelIsh> {
   if (await isDenoDeploy()) {
     const g = globalThis as GlobalThisWithBroadcastChannel;
-    return new g.BroadcastChannel(name);
+    return new g.BroadcastChannel(name) as BroadcastChannelIsh;
   }
 
   return new WebSocketBroadcastChannel(name);
