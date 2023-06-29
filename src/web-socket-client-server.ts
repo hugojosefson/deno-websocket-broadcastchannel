@@ -5,6 +5,7 @@ import {
 import { getPortNumber, s, safely, sleep, webSocketReadyState } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
 import { IdUrl } from "./id-url.ts";
+import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -16,16 +17,80 @@ type WhatAmI =
 const SLEEP_DURATION_MS = 50;
 
 export class WebSocketClientServer extends EventTarget implements Deno.Closer {
-  private readonly log1: Logger = log0.sub(WebSocketClientServer.name);
+  private readonly log1: Logger;
+  readonly channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
   private whatAmI: WhatAmI = "server";
   private wss?: WebSocketServer;
   private ws?: WebSocket;
   private outgoingMessages: string[] = [];
 
+  registerChannel(
+    channel: WebSocketBroadcastChannel,
+  ): void {
+    const log = log0.sub(this.registerChannel.name);
+
+    channel.addEventListener("close", () => {
+      log(
+        `channel.addEventListener('close', ...): unregistering channel ${channel?.name}...`,
+      );
+      this.unregisterChannel(channel);
+    });
+
+    log("adding channel:", channel.name);
+    this.getOrCreateChannelSet(channel.name).add(channel);
+  }
+
+  unregisterChannel(
+    channel: WebSocketBroadcastChannel,
+  ): void {
+    const log = log0.sub(this.unregisterChannel.name);
+    log("channel.name:", channel.name);
+    const channelSet: undefined | Set<WebSocketBroadcastChannel> = this
+      .channelSets
+      .get(
+        channel.name,
+      );
+    if (channelSet === undefined) {
+      log("channelSet === undefined; channel is not registered.");
+      return;
+    }
+    log("deleting channel:", channel.name);
+    channelSet.delete(channel);
+    log("channelSet.size:", channelSet.size);
+    if (channelSet.size === 0) {
+      log("channelSet.size === 0; deleting channelSet:", channel.name);
+      this.channelSets.delete(channel.name);
+    }
+    this.dispatchEvent(new Event("channel:unregistered"));
+  }
+
+  getOrCreateChannelSet(
+    name: string,
+  ): Set<WebSocketBroadcastChannel> {
+    const log = log0.sub(this.getOrCreateChannelSet.name);
+    log("name:", name);
+    log("channelSets.has(name):", this.channelSets.has(name));
+    if (!this.channelSets.has(name)) {
+      this.channelSets.set(name, new Set());
+    }
+    return this.channelSets.get(name)!;
+  }
+
+  getChannelSetOrDisconnectedEmptySet(
+    name: string,
+  ): Set<WebSocketBroadcastChannel> {
+    const log = log0.sub(this.getChannelSetOrDisconnectedEmptySet.name);
+    log("name:", name);
+    const channelSet = this.channelSets.get(name);
+    log("channelSet:", channelSet);
+    return channelSet ?? new Set();
+  }
+
   constructor(
-    private readonly url: IdUrl,
+    readonly url: IdUrl,
   ) {
     super();
+    this.log1 = log0.sub(WebSocketClientServer.name).sub(url.toString());
     const log2: Logger = this.log1.sub("constructor");
     (async () => {
       let log3: Logger;
