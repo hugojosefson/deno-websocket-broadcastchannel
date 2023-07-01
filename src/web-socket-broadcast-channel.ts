@@ -3,6 +3,7 @@ import { Logger, logger } from "./log.ts";
 import { WebSocketClientServer } from "./web-socket-client-server.ts";
 import {
   extractAnyMultiplexMessage,
+  LocalMultiplexMessage,
   MultiplexMessage,
 } from "./multiplex-message.ts";
 import { BroadcastChannelIsh } from "./types.ts";
@@ -59,19 +60,27 @@ export class WebSocketBroadcastChannel extends EventTarget
     ensureClientServer(this.url).registerChannel(this);
   }
   postMessage(message: string): void {
-    const log1 = this.log.sub("postMessage");
+    const log1 = this.log.sub(
+      WebSocketBroadcastChannel.prototype.postMessage.name,
+    );
     log1(`message: ${s(message)}`);
     if (this.closed) {
       log1("channel is closed; not posting message.");
       return;
     }
-    const message1: MultiplexMessage = { channel: this.name, message };
-    const message2: string = JSON.stringify(message1);
-    log1(`getClientServer().postMessage(${s(message2)})`);
-    ensureClientServer(this.url).postMessage(message2);
+
+    const localMultiplexMessage = new LocalMultiplexMessage(this, message);
+    log1(
+      `${ensureClientServer.name}(${
+        s(this.url)
+      }).${WebSocketClientServer.prototype.postMessage.name}(${
+        s(localMultiplexMessage)
+      })`,
+    );
+    ensureClientServer(this.url).postMessage(localMultiplexMessage);
   }
   close(): void {
-    const log1 = this.log.sub("close");
+    const log1 = this.log.sub(WebSocketBroadcastChannel.prototype.close.name);
     log1("closing channel...");
     this.closed = true;
     log1("dispatching close event...");

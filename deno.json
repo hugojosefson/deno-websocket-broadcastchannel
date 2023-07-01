@@ -3,7 +3,7 @@
     "all": "deno fmt && deno lint && deno task check && deno task readme && deno task test",
     "all-reload": "deno fmt && deno lint && deno task check --reload && deno task test --reload",
     "check": "sh -c '$(command -v fd || command -v fdfind) '\"'\"'\\.(mj|j|t)sx?$'\"'\"' --hidden --exec deno check {}'",
-    "test": "deno test --allow-run --allow-env=VERBOSE",
+    "test": "deno test --allow-run --allow-net --allow-env=VERBOSE,DEBUG",
     "readme": "touch README.md && chmod +w README.md && ./readme/generate-readme.ts readme/README.md https://deno.land/x/websocket_broadcastchannel > README.md && deno fmt README.md && chmod -w README.md",
     "readme-html": "deno task readme && sh -c 'docker run --rm -i hugojosefson/markdown <README.md >README.html'",
     "release": "deno task all && test -z \"$(git status --porcelain)\" && GITHUB_TOKEN=$(gh auth token) deno run --allow-env=GITHUB_TOKEN --allow-net=api.github.com --allow-run=bash https://deno.land/x/shipit@0.6.1/shipit.ts",

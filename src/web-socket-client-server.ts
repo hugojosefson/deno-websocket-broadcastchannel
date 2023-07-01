@@ -6,6 +6,7 @@ import { getPortNumber, s, safely, sleep, webSocketReadyState } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
 import { IdUrl } from "./id-url.ts";
 import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
+import { LocalMultiplexMessage } from "./multiplex-message.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -22,7 +23,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
   private whatAmI: WhatAmI = "server";
   private wss?: WebSocketServer;
   private ws?: WebSocket;
-  private outgoingMessages: string[] = [];
+  private outgoingMessages: LocalMultiplexMessage[] = [];
 
   registerChannel(
     channel: WebSocketBroadcastChannel,
@@ -305,7 +306,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
     this.dispatchEvent(new Event("close"));
   }
 
-  postMessage(message: string): void {
+  postMessage(message: LocalMultiplexMessage): void {
     const log2: Logger = this.log1.sub(this.postMessage.name);
     log2(`message: ${s(message)}`);
     if (this.isClosed()) {
@@ -316,10 +317,34 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
     this.possiblySendOutgoingMessages();
   }
 
-  private sendMessage(message: string, exceptClient?: WebSocket): boolean {
+  private sendMessage(
+    message: LocalMultiplexMessage,
+    exceptClient?: WebSocket,
+  ): boolean {
     const log2: Logger = this.log1.sub(this.sendMessage.name);
     log2(`message: ${s(message)}`);
     let log3: Logger;
+    if (this.whatAmI === "closed") {
+      log3 = log2.sub("closed");
+      log3("not sending message, because we're closed");
+      return false;
+    }
+    // send to local channel instances
+    log3 = log2.sub("local");
+    log3(`sending message to local channel instances`);
+    const channelSet: Set<WebSocketBroadcastChannel> = this
+      .getChannelSetOrDisconnectedEmptySet(message.channel);
+    for (const channelInstance of channelSet) {
+      if (channelInstance === message.from) {
+        log3(
+          `not sending message to channelInstance, because it's the one that send the message`,
+        );
+        continue;
+      }
+      channelInstance.dispatchEvent(
+        new MessageEvent("message", { data: message.message }),
+      );
+    }
     if (this.whatAmI === "server") {
       log3 = log2.sub("server");
       if (this.wss?.isListening()) {
@@ -336,9 +361,10 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
             continue;
           }
           try {
-            ws.send(message);
+            ws.send(message.serialize());
           } catch (e) {
             log3(`error sending message to client: ${s(e)}`);
+            safely(() => ws.close());
             this.wss.clients.delete(ws);
           }
         }
@@ -357,7 +383,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
       log3 = log2.sub("client");
       if (this.ws?.readyState === WebSocket.OPEN) {
         log3(`sending message to server: ${s(message)}`);
-        this.ws.send(message);
+        this.ws.send(message.serialize());
         return true;
       } else {
         log3(
@@ -367,7 +393,6 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
         );
       }
     }
-    log2(`not sending message, because whatAmI is ${s(this.whatAmI)}`);
     return false;
   }
 
@@ -378,7 +403,7 @@ export class WebSocketClientServer extends EventTarget implements Deno.Closer {
     log2(`whatAmI: ${s(this.whatAmI)}`);
 
     while (this.outgoingMessages.length > 0 && this.isConnected()) {
-      const message: string = this.outgoingMessages.shift()!;
+      const message: LocalMultiplexMessage = this.outgoingMessages.shift()!;
       log2(`sending message: ${s(message)}`);
       const didSendMessage = this.sendMessage(message);
       log2(`didSendMessage: ${didSendMessage}`);

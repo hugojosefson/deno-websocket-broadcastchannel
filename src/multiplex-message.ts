@@ -2,6 +2,7 @@ import { Logger, logger } from "./log.ts";
 
 import { WebSocketClientMessageEvent } from "./web-socket-server.ts";
 import { s } from "./fn.ts";
+import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -11,6 +12,28 @@ const log0: Logger = logger(import.meta.url);
 export interface MultiplexMessage {
   channel: string;
   message: string;
+}
+
+/**
+ * Adds information about which instance of WebSocketBroadcastChannel
+ * this MultiplexMessage was sent from.
+ */
+export class LocalMultiplexMessage implements MultiplexMessage {
+  constructor(
+    public readonly from: WebSocketBroadcastChannel,
+    public readonly message: string,
+  ) {}
+
+  get channel(): string {
+    return this.from.name;
+  }
+
+  serialize(): string {
+    return JSON.stringify({
+      channel: this.channel,
+      message: this.message,
+    });
+  }
 }
 
 /**
