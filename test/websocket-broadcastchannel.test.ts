@@ -22,8 +22,8 @@ beforeAll(() => {
 });
 
 describe("websocket-broadcastchannel", () => {
-  describe("same channel name", () => {
-    describe("two instances in same process", () => {
+  describe("in same process", () => {
+    describe("2 instances, same channel name", () => {
       it("should create them", async () => {
         await using(
           [
@@ -64,7 +64,7 @@ describe("websocket-broadcastchannel", () => {
         );
       });
     });
-    describe("three instances in same process", () => {
+    describe("3 instances, same channel name", () => {
       it("should create them", async () => {
         await using(
           [
@@ -119,69 +119,70 @@ describe("websocket-broadcastchannel", () => {
         );
       });
     });
-  });
-  describe("2 instances w/ channel name 'chat2' and 3 instances w/ channel name 'chat3'", () => {
-    it("should send one message from each, to the others of the same name", async () => {
-      await using(
-        [
-          () => createBroadcastChannel("chat2", url),
-          () => createBroadcastChannel("chat2", url),
-          () => createBroadcastChannel("chat3", url),
-          () => createBroadcastChannel("chat3", url),
-          () => createBroadcastChannel("chat3", url),
-        ],
-        async ([chat2a, chat2b, chat3a, chat3b, chat3c]) => {
-          const chat2DoneDeferred = deferred<void>();
-          const chat3DoneDeferred = deferred<void>();
-          const chat2ExpectedCount = 2;
-          const chat3ExpectedCount = 6;
-          let chat2ReceivedCount = 0;
-          let chat3ReceivedCount = 0;
-          const chat2ReceivedMessages: string[][] = [[], []];
-          const chat3ReceivedMessages: string[][] = [[], [], []];
-          const collectChat2Messages =
-            (index: number): (e: MessageEvent<string>) => void => (e) => {
-              chat2ReceivedMessages[index].push(e.data);
-              chat2ReceivedCount++;
-              if (chat2ReceivedCount === chat2ExpectedCount) {
-                chat2DoneDeferred.resolve();
-              }
-            };
-          const collectChat3Messages =
-            (index: number): (e: MessageEvent<string>) => void => (e) => {
-              chat3ReceivedMessages[index].push(e.data);
-              chat3ReceivedCount++;
-              if (chat3ReceivedCount === chat3ExpectedCount) {
-                chat3DoneDeferred.resolve();
-              }
-            };
 
-          chat2a.onmessage = collectChat2Messages(0);
-          chat2b.onmessage = collectChat2Messages(1);
+    describe("2 instances w/ channel name 'chat2' and 3 instances w/ channel name 'chat3'", () => {
+      it("should send one message from each, to the others of the same name", async () => {
+        await using(
+          [
+            () => createBroadcastChannel("chat2", url),
+            () => createBroadcastChannel("chat2", url),
+            () => createBroadcastChannel("chat3", url),
+            () => createBroadcastChannel("chat3", url),
+            () => createBroadcastChannel("chat3", url),
+          ],
+          async ([chat2a, chat2b, chat3a, chat3b, chat3c]) => {
+            const chat2DoneDeferred = deferred<void>();
+            const chat3DoneDeferred = deferred<void>();
+            const chat2ExpectedCount = 2;
+            const chat3ExpectedCount = 6;
+            let chat2ReceivedCount = 0;
+            let chat3ReceivedCount = 0;
+            const chat2ReceivedMessages: string[][] = [[], []];
+            const chat3ReceivedMessages: string[][] = [[], [], []];
+            const collectChat2Messages =
+              (index: number): (e: MessageEvent<string>) => void => (e) => {
+                chat2ReceivedMessages[index].push(e.data);
+                chat2ReceivedCount++;
+                if (chat2ReceivedCount === chat2ExpectedCount) {
+                  chat2DoneDeferred.resolve();
+                }
+              };
+            const collectChat3Messages =
+              (index: number): (e: MessageEvent<string>) => void => (e) => {
+                chat3ReceivedMessages[index].push(e.data);
+                chat3ReceivedCount++;
+                if (chat3ReceivedCount === chat3ExpectedCount) {
+                  chat3DoneDeferred.resolve();
+                }
+              };
 
-          chat3a.onmessage = collectChat3Messages(0);
-          chat3b.onmessage = collectChat3Messages(1);
-          chat3c.onmessage = collectChat3Messages(2);
+            chat2a.onmessage = collectChat2Messages(0);
+            chat2b.onmessage = collectChat2Messages(1);
 
-          chat2a.postMessage("from chat2a");
-          chat2b.postMessage("from chat2b");
+            chat3a.onmessage = collectChat3Messages(0);
+            chat3b.onmessage = collectChat3Messages(1);
+            chat3c.onmessage = collectChat3Messages(2);
 
-          chat3a.postMessage("from chat3a");
-          chat3b.postMessage("from chat3b");
-          chat3c.postMessage("from chat3c");
+            chat2a.postMessage("from chat2a");
+            chat2b.postMessage("from chat2b");
 
-          await rejectOnTimeout([chat2DoneDeferred, chat3DoneDeferred]);
-          assertEquals(chat2ReceivedMessages, [
-            ["from chat2b"],
-            ["from chat2a"],
-          ]);
-          assertEquals(chat3ReceivedMessages, [
-            ["from chat3b", "from chat3c"],
-            ["from chat3a", "from chat3c"],
-            ["from chat3a", "from chat3b"],
-          ]);
-        },
-      );
+            chat3a.postMessage("from chat3a");
+            chat3b.postMessage("from chat3b");
+            chat3c.postMessage("from chat3c");
+
+            await rejectOnTimeout([chat2DoneDeferred, chat3DoneDeferred]);
+            assertEquals(chat2ReceivedMessages, [
+              ["from chat2b"],
+              ["from chat2a"],
+            ]);
+            assertEquals(chat3ReceivedMessages, [
+              ["from chat3b", "from chat3c"],
+              ["from chat3a", "from chat3c"],
+              ["from chat3a", "from chat3b"],
+            ]);
+          },
+        );
+      });
     });
   });
 });
