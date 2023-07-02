@@ -1,3 +1,5 @@
+import { assertNotStrictEquals } from "https://deno.land/std@0.192.0/testing/asserts.ts";
+
 export const DEFAULT_TEST_TIMEOUT = 2000;
 
 export function rejectOnTimeout<T>(
@@ -23,4 +25,12 @@ export function rejectOnTimeout<T>(
       },
     );
   });
+}
+
+export function assertDifferentInstances<T>(xs: T[]) {
+  for (let i = 0; i < xs.length; i++) {
+    for (let j = i + 1; j < xs.length; j++) {
+      assertNotStrictEquals(xs[i], xs[j]);
+    }
+  }
 }
