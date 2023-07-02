@@ -1,17 +1,46 @@
-const SymbolWithDispose = Symbol as
-  & SymbolConstructor
-  & {
-    readonly dispose: unique symbol;
-    readonly asyncDispose: unique symbol;
-  };
+interface SymbolConstructor {
+  readonly dispose: unique symbol;
+  readonly asyncDispose: unique symbol;
+}
 
-type Disposable =
-  | { [SymbolWithDispose.dispose](): void }
-  | { [SymbolWithDispose.asyncDispose]: () => Promise<void> };
+function existsDisposeSymbol(s: unknown): s is SymbolConstructor & {
+  readonly dispose: unique symbol;
+} {
+  return typeof s === "function" &&
+    typeof (s as { dispose?: unknown }).dispose === "symbol";
+}
+
+function existsAsyncDisposeSymbol(s: unknown): s is SymbolConstructor & {
+  readonly asyncDispose: unique symbol;
+} {
+  return typeof s === "function" &&
+    typeof (s as { asyncDispose?: unknown }).asyncDispose === "symbol";
+}
+
+const fallbackDisposeSymbol: symbol = globalThis.Symbol("@@dispose");
+const fallbackAsyncDisposeSymbol: symbol = globalThis.Symbol("@@asyncDispose");
+
+if (!existsDisposeSymbol(globalThis.Symbol)) {
+  Object.assign(globalThis.Symbol, {
+    dispose: fallbackDisposeSymbol,
+  });
+}
+if (!existsAsyncDisposeSymbol(globalThis.Symbol)) {
+  Object.assign(globalThis.Symbol, {
+    asyncDispose: fallbackAsyncDisposeSymbol,
+  });
+}
+
+export const Symbol: SymbolConstructor = globalThis
+  .Symbol as unknown as SymbolConstructor;
+
+export type Disposable = { [Symbol.dispose](): void };
+export type AsyncDisposable = { [Symbol.asyncDispose](): Promise<void> };
 
 export type Resource =
   | Deno.Closer
-  | Disposable;
+  | Disposable
+  | AsyncDisposable;
 
 export type ResourceFactory<R extends Resource> = () => R | Promise<R>;
 
@@ -20,7 +49,7 @@ export type ResourceFactory<R extends Resource> = () => R | Promise<R>;
  *
  * Give it a bunch of functions that each create a resource, and a function that uses those resources.
  * It will call the resource-creating functions, and pass the resources to the using function.
- * Then "finally" it will [Symbol.dispose]/[Symbol.asyncDispose]/close all the resources.
+ * Then "finally" it will [Symbol.dispose]?.(), await [Symbol.asyncDispose]?.(), and await close?.() all the resources.
  */
 export async function using<
   T,
@@ -55,18 +84,18 @@ async function recursiveUsing<
       try {
         return await recursiveUsing(tail, fn, [...resources, resource]);
       } finally {
-        if (typeof SymbolWithDispose.dispose === "symbol" && SymbolWithDispose.dispose in resource) {
-          resource[SymbolWithDispose.dispose]();
+        if (Symbol.dispose in resource) {
+          resource[Symbol.dispose]();
         }
       }
     } finally {
-      if (typeof SymbolWithDispose.asyncDispose === "symbol" && SymbolWithDispose.asyncDispose in resource) {
-        await resource[SymbolWithDispose.asyncDispose]();
+      if (Symbol.asyncDispose in resource) {
+        await resource[Symbol.asyncDispose]();
       }
     }
   } finally {
-    if ("close" in resource) {
-      resource.close();
+    if ("close" in resource && typeof resource.close === "function") {
+      await resource.close();
     }
   }
 }

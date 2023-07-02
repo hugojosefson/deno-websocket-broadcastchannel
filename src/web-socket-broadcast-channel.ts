@@ -9,6 +9,7 @@ import {
 import { BroadcastChannelIsh } from "./types.ts";
 import { defaultWebSocketUrl } from "./default-websocket-url.ts";
 import { IdUrl } from "./id-url.ts";
+import { Disposable, Symbol } from "./using.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -33,7 +34,7 @@ const log0: Logger = logger(import.meta.url);
  * @see {@link https://deno.com/deploy/docs/runtime-broadcast-channel}
  */
 export class WebSocketBroadcastChannel extends EventTarget
-  implements BroadcastChannelIsh {
+  implements BroadcastChannelIsh, Disposable {
   onmessage: ((ev: Event) => void) | null = null;
   onmessageerror: ((ev: Event) => void) | null = null;
   private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
@@ -78,6 +79,9 @@ export class WebSocketBroadcastChannel extends EventTarget
       })`,
     );
     ensureClientServer(this.url).postMessage(localMultiplexMessage);
+  }
+  [Symbol.dispose](): void {
+    this.close();
   }
   close(): void {
     const log1 = this.log.sub(WebSocketBroadcastChannel.prototype.close.name);
