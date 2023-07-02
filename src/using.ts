@@ -23,25 +23,27 @@ export type ResourceFactory<R extends Resource> = () => R | Promise<R>;
  * Then "finally" it will [Symbol.dispose]/[Symbol.asyncDispose]/close all the resources.
  */
 export async function using<
+  T,
   R extends Resource,
   Rs extends R[] & { length: N },
   N extends number,
 >(
   resourceFactories: ResourceFactory<R>[] & { length: N },
-  fn: (resources: Rs) => void | Promise<void>,
-): Promise<void> {
+  fn: (resources: Rs) => T | Promise<T>,
+): Promise<T> {
   return await recursiveUsing(resourceFactories, fn, []);
 }
 
 async function recursiveUsing<
+  T,
   R extends Resource,
   Rs extends R[] & { length: N },
   N extends number,
 >(
   resourceFactories: ResourceFactory<R>[] & { length: N },
-  fn: (resources: Rs) => void | Promise<void>,
+  fn: (resources: Rs) => T | Promise<T>,
   resources: R[],
-): Promise<void> {
+): Promise<T> {
   if (resourceFactories.length === 0) {
     return fn(resources as Rs);
   }
