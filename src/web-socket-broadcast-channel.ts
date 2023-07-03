@@ -98,7 +98,7 @@ function ensureClientServer(url: IdUrl): WebSocketClientServer {
   const log1: Logger = log0.sub(ensureClientServer.name);
   const existingClientServer: undefined | WebSocketClientServer = clientServers
     .get(url);
-  log1("existingClientServer:", existingClientServer);
+  log1("!!existingClientServer:", !!existingClientServer);
   if (existingClientServer === undefined) {
     log1(
       "existingClientServer === undefined; creating new WebSocketClientServer...",
