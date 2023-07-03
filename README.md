@@ -193,7 +193,7 @@ async function main() {
   const chat: BroadcastChannelIsh = await createBroadcastChannel("chat");
 
   if (chat instanceof WebSocketBroadcastChannel) {
-    console.log(`
+    console.error(`
 ===============================================================================
 Welcome to the chat example of WebSocketBroadcastChannel!
 
@@ -210,7 +210,7 @@ the others will take over that duty, and the rest will reconnect to it.
 -------------------------------------------------------------------------------
     `.trim());
   } else {
-    console.log(`
+    console.error(`
 ===============================================================================
 Running on Deno Deploy. Application-wide BroadcastChannel is fully supported,
 so you don't need WebSocketBroadcastChannel!
