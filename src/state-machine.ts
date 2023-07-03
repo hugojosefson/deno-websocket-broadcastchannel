@@ -32,7 +32,7 @@ export class StateMachine<
     }
   }
 
-  transitionTo(to: S) {
+  transitionTo(to: S): T | void {
     const fn: OnTransition | undefined = this.getAnyTransitionFn(to);
     if (fn === undefined) {
       return this.onDisallowedTransition(this._state, to);

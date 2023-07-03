@@ -1,23 +1,30 @@
+import { StateMachine } from "./state-machine.ts";
+
 /**
  * OneTimeFuse
  *
  * You can blow it once, and after that, it will throw an exception if you try again.
  */
 export class OneTimeFuse {
-  private blown: boolean;
+  private readonly blown: StateMachine<boolean>;
   constructor(
     private readonly errorMessage = "Already blown!",
     private readonly errorConstructor = Error,
   ) {
-    this.blown = false;
+    this.blown = new StateMachine<boolean>(
+      false,
+      [
+        [false, true],
+      ],
+      (): never => {
+        throw new this.errorConstructor(this.errorMessage);
+      },
+    );
   }
   blow(): void | never {
-    if (this.blown) {
-      throw new this.errorConstructor(this.errorMessage);
-    }
-    this.blown = true;
+    this.blown.transitionTo(true);
   }
   get isBlown(): boolean {
-    return this.blown;
+    return this.blown.isFinal();
   }
 }
