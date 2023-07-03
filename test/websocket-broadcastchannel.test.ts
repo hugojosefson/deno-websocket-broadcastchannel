@@ -16,6 +16,10 @@ import { deferred } from "https://deno.land/std@0.192.0/async/deferred.ts";
 import { using } from "../src/using.ts";
 import { WebSocketBroadcastChannel } from "../mod.ts";
 
+import { run } from "https://deno.land/x/run_simple@2.1.0/mod.ts";
+import { s, ss } from "../src/fn.ts";
+import { CommandFailureError } from "https://deno.land/x/run_simple@2.1.0/src/run.ts";
+
 let url: URL;
 beforeAll(() => {
   url = defaultWebSocketUrl(getAvailablePort());
@@ -183,6 +187,36 @@ describe("websocket-broadcastchannel", () => {
           },
         );
       });
+    });
+  });
+  describe("in different processes", () => {
+    it("2 processes, 1 instance each, same channel name", async () => {
+      try {
+        const promises: [Promise<string>, Promise<string>] = [
+          run([
+            new URL("./one-channel.ts", import.meta.url).pathname,
+            "chat",
+          ], { stdin: "hello from 0" }),
+          run([
+            new URL("./one-channel.ts", import.meta.url).pathname,
+            "chat",
+          ], { stdin: "hello from 1" }),
+        ];
+        const [result0, result1]: [string, string] = await Promise.all(promises)
+          .catch((e) => {
+            console.error(e);
+            throw e;
+          });
+        assertEquals(s(result0), s("hello from 1"));
+        assertEquals(s(result1), s("hello from 0"));
+      } catch (e) {
+        if (e instanceof CommandFailureError) {
+          console.error(ss(e));
+        } else {
+          console.error(e);
+        }
+        throw e;
+      }
     });
   });
 });

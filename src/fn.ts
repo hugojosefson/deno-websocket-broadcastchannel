@@ -75,6 +75,15 @@ export function s(object: unknown): string {
 }
 
 /**
+ * Short for stringify with indentation, useful for logging.
+ * Uses JSON.stringify to convert an object to a string.
+ * @param object
+ */
+export function ss(object: unknown): string {
+  return JSON.stringify(object, null, 2);
+}
+
+/**
  * Executes a function, but swallows any errors.
  * @param fn the function to execute, and ignore any errors from.
  */
