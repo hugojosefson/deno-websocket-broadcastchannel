@@ -8,6 +8,7 @@ import { IdUrl } from "./id-url.ts";
 import { WebSocketClientServer } from "./web-socket-client-server.ts";
 import { Logger, logger } from "./log.ts";
 import { OneTimeFuse } from "./one-time-fuse.ts";
+import { equals } from "./fn.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -37,13 +38,13 @@ export class Manager {
   ): BroadcastChannelIsh {
     if ("BroadcastChannel" in globalThis) {
       const g = globalThis as GlobalThisWithBroadcastChannel;
-      if (
-        (g.BroadcastChannel as unknown as BroadcastChannelIsh) !==
-          (WebSocketBroadcastChannel as unknown as BroadcastChannelIsh)
-      ) {
+      // Only use the native BroadcastChannel if it's not the same as our own.
+      // Otherwise, fall through to instantiate a WebSocketBroadcastChannel.
+      if (!equals({ a: g.BroadcastChannel, b: WebSocketBroadcastChannel })) {
         return new g.BroadcastChannel(name) as BroadcastChannelIsh;
       }
     }
+    // Instantiate a WebSocketBroadcastChannel.
     const clientServer = this.ensureClientServer(IdUrl.of(url));
     return new WebSocketBroadcastChannel(clientServer, name);
   }

@@ -29,8 +29,16 @@ export async function weakEnvGet(
   return undefined;
 }
 
-export function equals(a: unknown, b: unknown): a is typeof b {
-  return a === b;
+/**
+ * Checks if two items are the same, and the same type.
+ * @param items.a The first item.
+ * @param items.b The second item.
+ * @returns Whether the two items are the same, and the same type.
+ */
+export function equals<A, B>(
+  items: { a: A; b: B },
+): items is typeof items & { a: B; b: B } & { a: A; b: A } {
+  return items.a as unknown === items.b;
 }
 
 export async function sleep(
