@@ -17,23 +17,21 @@ type WhatAmI =
   | "client"
   | "closed";
 
-const stateMachine = new StateMachine<WhatAmI>(
-  "server",
-  [
-    ["server", "client"],
-    ["client", "server"],
-    ["client", "closed"],
-    ["server", "closed"],
-  ],
-);
-
 const SLEEP_DURATION_MS = 50;
 
 export class WebSocketClientServer extends EventTarget
   implements Deno.Closer, Disposable {
   private readonly log1: Logger;
   readonly channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
-  private whatAmI: WhatAmI = "server";
+  private readonly role: StateMachine<WhatAmI> = new StateMachine<WhatAmI>(
+    "server",
+    [
+      ["client", "closed"],
+      ["server", "closed"],
+      ["client", "server"],
+      ["server", "client"],
+    ],
+  );
   private wss?: WebSocketServer;
   private ws?: WebSocket;
   private outgoingMessages: LocalMultiplexMessage[] = [];

@@ -1,4 +1,5 @@
 import { Logger, logger } from "./log.ts";
+import { GlobalThisWithBroadcastChannel } from "./types.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -28,11 +29,8 @@ export async function weakEnvGet(
   return undefined;
 }
 
-/**
- * Checks if the current environment is Deno Deploy.
- */
-export async function isDenoDeploy(): Promise<boolean> {
-  return (await weakEnvGet("DENO_DEPLOYMENT_ID")) !== undefined;
+export function equals(a: unknown, b: unknown): a is typeof b {
+  return a === b;
 }
 
 export async function sleep(

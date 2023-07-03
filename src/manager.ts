@@ -4,7 +4,6 @@ import {
   BroadcastChannelIsh,
   GlobalThisWithBroadcastChannel,
 } from "./types.ts";
-import { isDenoDeploy } from "./fn.ts";
 import { IdUrl } from "./id-url.ts";
 import { WebSocketClientServer } from "./web-socket-client-server.ts";
 import { Logger, logger } from "./log.ts";
@@ -16,11 +15,15 @@ export class Manager {
   private static readonly singletonFuse: OneTimeFuse = new OneTimeFuse(
     "Manager already instantiated. You only get one.",
   );
-  private readonly clientServers: Map<IdUrl, WebSocketClientServer> = new Map();
-
   constructor() {
     Manager.singletonFuse.blow();
   }
+
+  /**
+   * We want one {@link WebSocketClientServer} per WebSocket url.
+   * @private
+   */
+  private readonly clientServers: Map<IdUrl, WebSocketClientServer> = new Map();
 
   /**
    * Creates a {@link BroadcastChannel} or {@link WebSocketBroadcastChannel}, depending on
@@ -28,16 +31,21 @@ export class Manager {
    * @param name The name of the channel.
    * @param url WebSocket url to connect to or listen as, if not on Deno Deploy. Defaults to {@link defaultWebSocketUrl}() if not specified.
    */
-  async createBroadcastChannel(
+  createBroadcastChannel(
     name: string,
     url: string | URL = defaultWebSocketUrl(),
-  ): Promise<BroadcastChannelIsh> {
-    if (await isDenoDeploy()) {
+  ): BroadcastChannelIsh {
+    if ("BroadcastChannel" in globalThis) {
       const g = globalThis as GlobalThisWithBroadcastChannel;
-      return new g.BroadcastChannel(name) as BroadcastChannelIsh;
+      if (
+        (g.BroadcastChannel as unknown as BroadcastChannelIsh) !==
+          (WebSocketBroadcastChannel as unknown as BroadcastChannelIsh)
+      ) {
+        return new g.BroadcastChannel(name) as BroadcastChannelIsh;
+      }
     }
     const clientServer = this.ensureClientServer(IdUrl.of(url));
-    return new WebSocketBroadcastChannel(name, url);
+    return new WebSocketBroadcastChannel(clientServer, name);
   }
 
   private ensureClientServer(url: IdUrl): WebSocketClientServer {
