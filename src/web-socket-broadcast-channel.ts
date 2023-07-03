@@ -10,6 +10,8 @@ import { BroadcastChannelIsh } from "./types.ts";
 import { defaultWebSocketUrl } from "./default-websocket-url.ts";
 import { IdUrl } from "./id-url.ts";
 import { Disposable, Symbol } from "./using.ts";
+import { OneTimeFuse } from "./one-time-fuse.ts";
+import { IdUrlChannel } from "./id-url-channel.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -38,20 +40,24 @@ export class WebSocketBroadcastChannel extends EventTarget
   onmessage: ((ev: Event) => void) | null = null;
   onmessageerror: ((ev: Event) => void) | null = null;
   private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
-  private closed = false;
-  public readonly name: string;
-  readonly url: IdUrl;
+  private closeFuse = new OneTimeFuse("channel is already closed");
+  get name(): string {
+    return this.idUrlChannel.channel;
+  }
+  get url(): string {
+    return this.idUrlChannel.url;
+  }
+  private readonly idUrlChannel: IdUrlChannel;
 
   /**
    * Creates a {@link WebSocketBroadcastChannel}.
+   * @param clientServer The {@link WebSocketClientServer} to use for communicating with other instances.
    * @param name The name of the channel.
-   * @param url WebSocket url to connect to or listen as. Defaults to {@link defaultWebSocketUrl}() if not specified.
    */
-  constructor(name: string, url: IdUrl | URL | string = defaultWebSocketUrl()) {
+  constructor(clientServer: WebSocketClientServer, name: string) {
     super();
     this.log.sub("constructor")(`name: ${s(name)}`);
-    this.name = name;
-    this.url = IdUrl.of(url);
+    this.idUrlChannel = IdUrlChannel.of(url, name);
     this.addEventListener("message", (e: Event) => this.onmessage?.(e));
     this.addEventListener(
       "messageerror",
@@ -65,7 +71,7 @@ export class WebSocketBroadcastChannel extends EventTarget
       WebSocketBroadcastChannel.prototype.postMessage.name,
     );
     log1(`message: ${s(message)}`);
-    if (this.closed) {
+    if (this.closeFuse.isBlown()) {
       log1("channel is closed; not posting message.");
       return;
     }
@@ -81,86 +87,22 @@ export class WebSocketBroadcastChannel extends EventTarget
     ensureClientServer(this.url).postMessage(localMultiplexMessage);
   }
   [Symbol.dispose](): void {
+    const log1 = this.log.sub(
+      WebSocketBroadcastChannel.prototype[Symbol.dispose].name,
+    );
+    log1("disposing channel, via close()...");
     this.close();
   }
   close(): void {
     const log1 = this.log.sub(WebSocketBroadcastChannel.prototype.close.name);
     log1("closing channel...");
-    this.closed = true;
+    this.closeFuse.blow();
     log1("dispatching close event...");
     this.dispatchEvent(new CloseEvent("close"));
   }
 }
 
 const clientServers: Map<IdUrl, WebSocketClientServer> = new Map();
-
-function ensureClientServer(url: IdUrl): WebSocketClientServer {
-  const log1: Logger = log0.sub(ensureClientServer.name);
-  const existingClientServer: undefined | WebSocketClientServer = clientServers
-    .get(url);
-  log1("!!existingClientServer:", !!existingClientServer);
-  if (existingClientServer === undefined) {
-    log1(
-      "existingClientServer === undefined; creating new WebSocketClientServer...",
-    );
-    const clientServer = new WebSocketClientServer(url);
-    clientServers.set(url, clientServer);
-
-    clientServer.addEventListener("channel:unregistered", () => {
-      possiblyUnregisterClientServer(clientServer);
-    });
-
-    clientServer.addEventListener("close", () => {
-      const log = log1.sub("clientServer.addEventListener('close', ...)");
-      log("clientServer closed; dispatching close events to channels...");
-
-      for (const channelSet of clientServer.channelSets.values()) {
-        for (const channel of channelSet) {
-          log("dispatching close event to channel:", channel.name);
-          channel.dispatchEvent(new CloseEvent("close"));
-        }
-      }
-
-      log("setting clientServer = undefined");
-      clientServers.delete(url);
-    });
-
-    clientServer.addEventListener("error", (e: Event) => {
-      const log = log1.sub("clientServer.addEventListener('error', ...)");
-      log("clientServer error:", e);
-
-      log("dispatching error events to channels...");
-      for (const channelSet of clientServer.channelSets.values()) {
-        for (const channel of channelSet) {
-          log("dispatching error event to channel:", channel.name);
-          channel.dispatchEvent(new ErrorEvent("error", e));
-        }
-      }
-    });
-
-    clientServer.addEventListener("message", (e: Event) => {
-      const log = log1.sub("clientServer.addEventListener('message', ...)");
-      if (!(e instanceof MessageEvent)) {
-        log(
-          "Unexpected non-MessageEvent from clientServer:",
-          e,
-        );
-        return;
-      }
-      const multiplexMessage: MultiplexMessage = extractAnyMultiplexMessage(e);
-      log("clientServer message is a MultiplexMessage:", multiplexMessage);
-      const channels: Set<WebSocketBroadcastChannel> = clientServer
-        .getChannelSetOrDisconnectedEmptySet(multiplexMessage.channel);
-      for (const channel of channels) {
-        log("dispatching message to channel:", channel.name);
-        channel.dispatchEvent(
-          new MessageEvent("message", { data: multiplexMessage.message }),
-        );
-      }
-    });
-  }
-  return clientServers.get(url)!;
-}
 
 function possiblyUnregisterClientServer(clientServer: WebSocketClientServer) {
   const log = log0.sub(possiblyUnregisterClientServer.name);

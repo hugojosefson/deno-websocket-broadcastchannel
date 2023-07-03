@@ -22,6 +22,9 @@ export interface BroadcastChannelConstructor {
 /**
  * What {@link https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/globalThis|globalThis}
  * looks like when it has {@link BroadcastChannel}.
+ *
+ * We use this to convince TypeScript that `globalThis.BroadcastChannel` exists, so typechecking passes. Then we use
+ * runtime checks to ensure that it actually exists.
  */
 export type GlobalThisWithBroadcastChannel = typeof globalThis & {
   BroadcastChannel: BroadcastChannelConstructor;

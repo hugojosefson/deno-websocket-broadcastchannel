@@ -7,17 +7,30 @@ import { Logger, logger } from "./log.ts";
 import { IdUrl } from "./id-url.ts";
 import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
 import { LocalMultiplexMessage } from "./multiplex-message.ts";
-
+import { Disposable } from "./using.ts";
 const log0: Logger = logger(import.meta.url);
+
+import { StateMachine } from "./state-machine.ts";
 
 type WhatAmI =
   | "server"
   | "client"
   | "closed";
 
+const stateMachine = new StateMachine<WhatAmI>(
+  "server",
+  [
+    ["server", "client"],
+    ["client", "server"],
+    ["client", "closed"],
+    ["server", "closed"],
+  ],
+);
+
 const SLEEP_DURATION_MS = 50;
 
-export class WebSocketClientServer extends EventTarget implements Deno.Closer {
+export class WebSocketClientServer extends EventTarget
+  implements Deno.Closer, Disposable {
   private readonly log1: Logger;
   readonly channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
   private whatAmI: WhatAmI = "server";
