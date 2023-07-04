@@ -8,10 +8,10 @@ import { getPortNumber } from "./fn.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export type ClientServerState =
+type ClientServerState =
   | "server wannabe"
-  | "server starting"
-  | "server"
+  | "server listen"
+  | "server listener accept"
   | "server collision"
   | "server failed"
   | "client wannabe"
@@ -31,6 +31,64 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   private outgoingMessages: LocalMultiplexMessage[] = [];
   readonly url: IdUrl;
 
+  private serverListen() {
+    const port: number = getPortNumber(this.url);
+    try {
+      this.listener = Deno.listen({
+        port,
+        transport: "tcp",
+        hostname: this.url.hostname,
+      });
+    } catch (e) {
+      return this.state.transitionTo(
+        e instanceof Deno.errors.AddrInUse
+          ? "server collision"
+          : "server failed",
+      );
+    }
+  }
+
+  private serverCollision() {
+    this.listener?.close();
+    this.listener = undefined;
+    return this.state.transitionTo("client wannabe");
+  }
+
+  private async serverListenerAccept() {
+    const conn = await this.listener?.accept();
+    if (!conn) {
+      return this.state.transitionTo("server failed");
+    }
+    // are we hanging here?
+    // can we accept multiple connections? multiple requests?
+    const httpConn: Deno.HttpConn = Deno.serveHttp(conn);
+    const requestEvent: Deno.RequestEvent | null = await httpConn.nextRequest();
+    if (!requestEvent) {
+      return this.state.transitionTo("server listener accept");
+    }
+    const req = requestEvent.request;
+    const upgrade = req.headers.get("upgrade") || "";
+    if (upgrade.toLowerCase() !== "websocket") {
+      await requestEvent.respondWith(
+        new Response(null, {
+          status: 400,
+        }),
+      );
+      return this.state.transitionTo("server listener accept");
+    }
+    const webSocketUpgrade: Deno.WebSocketUpgrade = Deno
+      .upgradeWebSocket(req);
+    const ws: WebSocket = webSocketUpgrade.socket;
+    ws.addEventListener("open", () => {
+      this.clients.add(ws);
+    });
+    ws.addEventListener("close", () => {
+      this.clients.delete(ws);
+    });
+    await requestEvent.respondWith(webSocketUpgrade.response);
+    return this.state.transitionTo("server listener accept");
+  }
+
   createClientServerStateMachine(): StateMachine<ClientServerState> {
     return new StateMachine<ClientServerState>(
       "server wannabe",
@@ -40,83 +98,29 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
       [
         {
           from: "server wannabe",
-          to: "server starting",
+          to: "server listen",
           description: "start listening",
-          fn: () => {
-            const port: number = getPortNumber(this.url);
-            try {
-              this.listener = Deno.listen({
-                port,
-                transport: "tcp",
-                hostname: this.url.hostname,
-              });
-            } catch (e) {
-              return this.state.transitionTo(
-                e instanceof Deno.errors.AddrInUse
-                  ? "server collision"
-                  : "server failed",
-              );
-            }
-          },
+          fn: this.serverListen.bind(this),
         },
         {
-          from: "server starting",
+          from: "server listen",
           to: "server collision",
           description: "address in use",
-          fn: () => {
-            this.listener?.close();
-            this.listener = undefined;
-            return this.state.transitionTo("client wannabe");
-          },
+          fn: this.serverCollision.bind(this),
         },
         {
-          from: "server starting",
-          to: "server",
-          description: "listening",
-          fn: () => {
-            if (!this.listener) {
-              return this.state.transitionTo("server failed");
-            }
-          },
+          from: "server listen",
+          to: "server listener accept",
+          description: "accept next connection",
         },
         {
-          from: "server",
-          to: "server",
+          from: "server listener accept",
+          to: "server listener accept",
           description: "next connection",
-          fn: async () => {
-            const conn = await this.listener?.accept();
-            if (!conn) {
-              return this.state.transitionTo("server failed");
-            }
-            // are we hanging here?
-            // can we accept multiple connections? multiple requests?
-            const httpConn: Deno.HttpConn = Deno.serveHttp(conn);
-            for await (const requestEvent of httpConn) {
-              const req = requestEvent.request;
-              const upgrade = req.headers.get("upgrade") || "";
-              if (upgrade.toLowerCase() !== "websocket") {
-                await requestEvent.respondWith(
-                  new Response(null, {
-                    status: 400,
-                  }),
-                );
-                continue;
-              }
-              const webSocketUpgrade: Deno.WebSocketUpgrade = Deno
-                .upgradeWebSocket(req);
-              const ws: WebSocket = webSocketUpgrade.socket;
-              ws.addEventListener("open", () => {
-                this.clients.add(ws);
-              });
-              ws.addEventListener("close", () => {
-                this.clients.delete(ws);
-              });
-              await requestEvent.respondWith(webSocketUpgrade.response);
-            }
-          },
+          fn: this.serverListenerAccept.bind(this),
         },
         {
-          from: "server starting",
+          from: "server listen",
           to: "server failed",
           description: "other error",
         },
@@ -126,7 +130,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           description: "!closed",
         },
         {
-          from: "server",
+          from: "server listener accept",
           to: "server failed",
           description: "fatal error",
         },
@@ -191,7 +195,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           description: "should close",
         },
         {
-          from: "server starting",
+          from: "server listen",
           to: "closed",
           description: "should close",
         },
@@ -201,7 +205,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           description: "should close",
         },
         {
-          from: "server",
+          from: "server listener accept",
           to: "closed",
           description: "should close",
         },
