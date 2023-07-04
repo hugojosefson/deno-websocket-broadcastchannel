@@ -6,6 +6,9 @@ if (import.meta.main) {
     .createClientServerStateMachine();
   await Deno.writeTextFile(
     new URL("./client-server-state.puml", import.meta.url).pathname,
-    sm.toPlantUml(false),
+    sm.toPlantUml(
+      `${WebSocketClientServer.name}\nState Machine`,
+      false,
+    ),
   );
 }

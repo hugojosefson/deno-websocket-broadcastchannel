@@ -6,6 +6,7 @@ skinparam ArrowColor lightblue
 skinparam StateFontColor blue
 skinparam StateBackgroundColor lightblue
 skinparam StateBorderColor none
+title "WebSocketClientServer\nState Machine"
 state "server wannabe" as server_wannabe
 state "server starting" as server_starting
 state "server collision" as server_collision

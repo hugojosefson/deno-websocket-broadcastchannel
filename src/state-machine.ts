@@ -77,7 +77,7 @@ export class StateMachine<
    *
    * Marks the initial state (as read from this._state) with a star.
    */
-  toPlantUml(includeFinal = true): string {
+  toPlantUml(title?: string, includeFinal = true): string {
     function short(state: S): string {
       return `${state}`.replace(/ /g, "_");
     }
@@ -152,9 +152,15 @@ export class StateMachine<
       "skinparam StateBackgroundColor lightblue",
       "skinparam StateBorderColor none",
 
+      /** Declare title. */
+      ...(typeof title === "string" && title.length > 0
+        ? [`title ${this.escapePlantUmlString(title)}`]
+        : []),
+
       /** Declare any state short names. */
       ...states.filter((state) => `${state}` !== short(state)).map(
-        (state: S) => `state ${s(state)} as ${short(state)}`,
+        (state: S) =>
+          `state ${this.escapePlantUmlString(`${state}`)} as ${short(state)}`,
       ),
 
       /** Declare initial state. */
@@ -173,6 +179,15 @@ export class StateMachine<
 
       "@enduml",
     ].join("\n");
+  }
+
+  private escapePlantUmlString(str?: string): string {
+    return [
+      '"',
+      (str ?? "")
+        .replace(/\n/g, "\\n"),
+      '"',
+    ].join("");
   }
 
   private setTransition(
