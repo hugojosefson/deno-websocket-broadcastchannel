@@ -89,7 +89,9 @@ export class StateMachine<
   }
 
   isFinal(from: S = this._state): boolean {
-    return this.getAvailableTransitions(from).length === 0;
+    const availableTransitions = this.getAvailableTransitions(from);
+    return availableTransitions.length === 0 ||
+      (availableTransitions.length === 1 && availableTransitions[0] === from);
   }
 
   getAvailableTransitions(from: S = this._state): S[] {
@@ -107,7 +109,7 @@ export class StateMachine<
       return `${state}`.replace(/ /g, "_");
     }
 
-    const states: S[] = Array.from(
+    let states: S[] = Array.from(
       new Set([
         ...this.transitions.keys(),
         ...[...this.transitions.values()].flatMap((
@@ -117,7 +119,7 @@ export class StateMachine<
         ]),
       ]),
     );
-    const transitions: TransitionDefinition<S>[] = [];
+    let transitions: TransitionDefinition<S>[] = [];
     for (const [from, fromTo] of this.transitions.entries()) {
       for (const to of fromTo.keys()) {
         transitions.push(
@@ -131,26 +133,17 @@ export class StateMachine<
     }
 
     const initial: S = this._state;
-    const finalStates: S[] = states.filter((state: S) => this.isFinal(state));
+    let finalStates: S[] = states.filter((state: S) => this.isFinal(state));
 
-    /** splice out the final states from the states list, and the transitions */
+    /** remove final states, transitions to them */
     if (!includeFinal) {
-      for (const finalState of finalStates) {
-        const index = states.indexOf(finalState);
-        if (index !== -1) {
-          states.splice(index, 1);
-        }
-      }
-      for (const transition of transitions) {
-        const { to } = transition;
-        if (finalStates.includes(to)) {
-          const index = transitions.indexOf(transition);
-          if (index !== -1) {
-            transitions.splice(index, 1);
-          }
-        }
-      }
-      finalStates.splice(0, finalStates.length);
+      states = states.filter((state: S) => !finalStates.includes(state));
+
+      transitions = transitions.filter((
+        transition: TransitionDefinition<S>,
+      ) => !finalStates.includes(transition.to));
+
+      finalStates = [];
     }
 
     /**
