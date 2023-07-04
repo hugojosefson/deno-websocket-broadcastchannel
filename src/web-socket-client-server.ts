@@ -48,11 +48,12 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
                 hostname: this.url.hostname,
               });
             } catch (e) {
-              if (e instanceof Deno.errors.AddrInUse) {
-                return this.state.transitionTo("server collision");
-              } else {
-                return this.state.transitionTo("server failed");
-              }
+              const next: ClientServerState = this.shouldClose
+                ? "closed"
+                : e instanceof Deno.errors.AddrInUse
+                ? "server collision"
+                : "server failed";
+              return this.state.transitionTo(next);
             }
           },
         },
