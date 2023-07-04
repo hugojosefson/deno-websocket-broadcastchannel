@@ -71,6 +71,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
 
     for await (const requestEvent of httpConn) {
       const req = requestEvent.request;
+
       const upgradeHeader = req.headers.get("upgrade") || "";
       if (upgradeHeader.toLowerCase() !== "websocket") {
         await requestEvent.respondWith(
@@ -80,7 +81,9 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         );
         return this.state.transitionTo("accept next connection");
       }
+
       const upgrade: Deno.WebSocketUpgrade = Deno.upgradeWebSocket(req);
+
       const ws: WebSocket = upgrade.socket;
       ws.addEventListener("open", () => {
         this.clients.add(ws);
@@ -88,6 +91,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
       ws.addEventListener("close", () => {
         this.clients.delete(ws);
       });
+
       await requestEvent.respondWith(upgrade.response);
     }
   }
