@@ -1,0 +1,29 @@
+@startuml
+hide empty description
+skinparam ArrowFontColor #bbb
+skinparam ArrowFontStyle italic
+skinparam ArrowColor lightblue
+skinparam StateFontColor blue
+skinparam StateBackgroundColor lightblue
+skinparam StateBorderColor none
+state "server wannabe" as server_wannabe
+state "server starting" as server_starting
+state "server collision" as server_collision
+state "server failed" as server_failed
+state "client wannabe" as client_wannabe
+state "client starting" as client_starting
+state "client failed" as client_failed
+[*] --> server_wannabe
+server_wannabe --> server_starting: start listening
+server_starting --> server_collision: address in use
+server_starting --> server: listening
+server_starting --> server_failed: other error
+server_collision --> client_wannabe: !closed
+server --> server_failed: fatal error
+server_failed --> client_wannabe: !closed
+client_wannabe --> client_starting: start connecting
+client_starting --> client: connected
+client_starting --> client_failed: could not
+client --> client_failed: fatal error
+client_failed --> server_wannabe: !closed
+@enduml
