@@ -1,4 +1,4 @@
-import { s } from "./fn.ts";
+import { equals, s } from "./fn.ts";
 import { PromiseQueue } from "./promise-queue.ts";
 
 export interface TransitionDefinition<S> {
@@ -207,22 +207,31 @@ export class StateMachine<
      * description, it is used. Otherwise, an empty string is returned.
      * @param description transition description
      * @param fn transition function
+     * @param to to state
      */
     function note(
-      { description, fn }: Partial<
-        Pick<TransitionDefinition<S>, "description" | "fn">
-      >,
+      { description, fn, to }:
+        & Partial<
+          Pick<TransitionDefinition<S>, "description" | "fn">
+        >
+        & Pick<TransitionDefinition<S>, "to">,
     ): string {
-      if (typeof description === "string" && description.length > 0) {
-        return `: ${description.replace(/"/g, "'")}`;
-      }
-      if (
-        fn !== undefined && fn !== noop && unbound(fn?.name).length > 0
-      ) {
-        return `: ${unCamelCase(unbound(fn.name))}`;
-      }
+      const s = (() => {
+        if (typeof description === "string" && description.length > 0) {
+          return description.replace(/"/g, "'");
+        }
+        if (
+          fn !== undefined && fn !== noop && unbound(fn?.name).length > 0
+        ) {
+          return unCamelCase(unbound(fn.name));
+        }
 
-      return "";
+        return "";
+      })();
+      if (s.length === 0 || equals({ a: s, b: to })) {
+        return "";
+      }
+      return `: ${s}`;
     }
 
     /**
@@ -262,7 +271,7 @@ export class StateMachine<
       ...transitions.map(
         ({ from, to, description, fn }: TransitionDefinition<S>) =>
           `${short(from)} ${arrow({ to, fn })} ${short(to)}${
-            note({ description, fn })
+            note({ description, fn, to })
           }`,
       ),
 
