@@ -168,12 +168,22 @@ export class StateMachine<
      * a dotted arrow.
      * @param _from from state, unused for now
      * @param to to state
+     * @param fn transition function
      */
-    function arrow(_from: S, to: S): string {
+    function arrow(
+      { to, fn }: Pick<TransitionDefinition<S>, "to" | "fn">,
+    ): string {
+      const modifiers: string[] = [];
       if (finalStates.includes(to)) {
-        return "-[dotted]->";
+        modifiers.push("dotted");
       }
-      return "-->";
+      if (fn !== undefined && fn !== noop) {
+        modifiers.push("thickness=2");
+      }
+      if (modifiers.length === 0) {
+        return "-->";
+      }
+      return `-[${modifiers.join()}]->`;
     }
 
     /**
@@ -193,32 +203,40 @@ export class StateMachine<
      */
     return [
       "@startuml",
-      "hide empty description",
-      "skinparam ArrowFontColor #bbb",
-      "skinparam ArrowFontStyle italic",
-      "skinparam ArrowColor lightblue",
-      "skinparam StateFontColor blue",
-      "skinparam StateBackgroundColor lightblue",
-      "skinparam StateBorderColor none",
+      ...`
+      hide empty description
+      skinparam shadowing true
+      skinparam ArrowFontColor #bbb
+      skinparam ArrowFontStyle italic
+      skinparam ArrowColor blue
+      skinparam ArrowThickness 0.2
+      skinparam StateFontColor blue
+      skinparam StateBackgroundColor lightblue
+      skinparam StateBorderColor blue
+      skinparam StateBorderThickness 2
+      `.trim().split("\n").map((line) => line.trim()),
 
       /** Declare title. */
       ...(typeof title === "string" && title.length > 0
         ? [`title ${this.escapePlantUmlString(title)}`]
         : []),
 
-      /** Declare any state short names. */
-      ...states.filter((state) => `${state}` !== short(state)).map(
-        (state: S) =>
-          `state ${this.escapePlantUmlString(`${state}`)} as ${short(state)}`,
-      ),
+      /** Declare the states. */
+      ...states
+        .map(
+          (state: S) =>
+            `state ${this.escapePlantUmlString(`${state}`)} as ${short(state)}`,
+        ),
 
       /** Declare initial state. */
       `[*] --> ${short(initial)}`,
 
       /** Declare transitions. */
       ...transitions.map(
-        ({ from, to, description }: TransitionDefinition<S>) =>
-          `${short(from)} ${arrow(from, to)} ${short(to)}${note(description)}`,
+        ({ from, to, description, fn }: TransitionDefinition<S>) =>
+          `${short(from)} ${arrow({ to, fn })} ${short(to)}${
+            note(description)
+          }`,
       ),
 
       /** Declare final states. */

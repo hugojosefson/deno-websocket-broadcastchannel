@@ -1,11 +1,14 @@
 @startuml
 hide empty description
+skinparam shadowing true
 skinparam ArrowFontColor #bbb
 skinparam ArrowFontStyle italic
-skinparam ArrowColor lightblue
+skinparam ArrowColor blue
+skinparam ArrowThickness 0.2
 skinparam StateFontColor blue
 skinparam StateBackgroundColor lightblue
-skinparam StateBorderColor none
+skinparam StateBorderColor blue
+skinparam StateBorderThickness 2
 title "WebSocketClientServer\nState Machine"
 state "server wannabe" as server_wannabe
 state "server listen" as server_listen
@@ -14,13 +17,14 @@ state "server collision" as server_collision
 state "server failed" as server_failed
 state "client wannabe" as client_wannabe
 state "client starting" as client_starting
+state "client" as client
 state "client failed" as client_failed
 [*] --> server_wannabe
-server_wannabe --> server_listen: start listening
-server_listen --> server_collision: address in use
+server_wannabe -[thickness=2]-> server_listen: start listening
+server_listen -[thickness=2]-> server_collision: address in use
 server_listen --> server_listener_accept: accept next connection
 server_listen --> server_failed: other error
-server_listener_accept --> server_listener_accept: next connection
+server_listener_accept -[thickness=2]-> server_listener_accept: next connection
 server_listener_accept --> server_failed: fatal error
 server_collision --> client_wannabe: !closed
 server_failed --> client_wannabe: !closed
