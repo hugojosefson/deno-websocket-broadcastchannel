@@ -74,7 +74,7 @@ export class StateMachine<
 
     /** run transition function */
     const fn = transition.fn;
-    const result = fn(transition);
+    const result: void | Promise<void> = fn(transition);
     /** if transition function returns a Promise, enqueue it */
     if (result instanceof Promise) {
       return this.promiseQueue.enqueue(async () => {

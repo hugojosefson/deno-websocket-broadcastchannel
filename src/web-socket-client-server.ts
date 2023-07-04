@@ -25,7 +25,8 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   private readonly log1: Logger;
   readonly channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
   private readonly state: StateMachine<ClientServerState>;
-  private wss?: WebSocketServer;
+  private listener?: Deno.Listener;
+  private readonly clients: Set<WebSocket> = new Set<WebSocket>();
   private ws?: WebSocket;
   private outgoingMessages: LocalMultiplexMessage[] = [];
   readonly url: IdUrl;
@@ -39,24 +40,36 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           to: "server starting",
           description: "start listening",
           fn: async () => {
-            this.wss = new WebSocketServer(getPortNumber(this.url));
-
-            this.wss.addEventListener("error", (e) => {
-              if (
-                e instanceof ErrorEvent &&
-                e.error instanceof Deno.errors.AddrInUse
-              ) {
-                this.state.transitionTo("server collision");
-              } else {
-                this.state.transitionTo("server failed");
+            const port: number = getPortNumber(this.url);
+            this.listener = Deno.listen({
+              port,
+              transport: "tcp",
+              hostname: this.url.hostname,
+            });
+            for await (const conn of this.listener) {
+              const httpConn: Deno.HttpConn = Deno.serveHttp(conn);
+              for await (const requestEvent of httpConn) {
+                const req = requestEvent.request;
+                const upgrade = req.headers.get("upgrade") || "";
+                if (upgrade.toLowerCase() !== "websocket") {
+                  await requestEvent.respondWith(
+                    new Response(null, {
+                      status: 400,
+                    }),
+                  );
+                  continue;
+                }
+                const webSocketUpgrade: Deno.WebSocketUpgrade = Deno
+                  .upgradeWebSocket(req);
+                const ws: WebSocket = webSocketUpgrade.socket;
+                ws.addEventListener("open", () => {
+                  this.clients.add(ws);
+                });
+                ws.addEventListener("close", () => {
+                  this.clients.delete(ws);
+                });
+                await requestEvent.respondWith(webSocketUpgrade.response);
               }
-            });
-
-            this.wss.addEventListener("open", () => {
-              this.state.transitionTo("server");
-            });
-
-            for await (const ws of this.wss.server) {
             }
           },
         },
