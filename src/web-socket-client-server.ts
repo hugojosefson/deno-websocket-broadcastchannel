@@ -5,6 +5,7 @@ import { LocalMultiplexMessage } from "./multiplex-message.ts";
 import { Disposable, Symbol } from "./using.ts";
 import { StateMachine } from "./state-machine.ts";
 import { getPortNumber, safely } from "./fn.ts";
+import Conn = Deno.Conn;
 
 const log0: Logger = logger(import.meta.url);
 
@@ -52,57 +53,67 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     return this.state.transitionTo("client wannabe");
   }
 
+  private readonly handleConnPromises: Set<Promise<void>> = new Set();
   private async acceptNextConnection() {
-    const conn = await this.listener?.accept();
-    if (!conn) {
+    const conn: Conn | undefined = await this.listener?.accept();
+    if (conn === undefined) {
       return this.state.transitionTo("server failed");
     }
-    // are we hanging here?
-    // can we accept multiple connections? multiple requests?
-    const httpConn: Deno.HttpConn = Deno.serveHttp(conn);
-    const requestEvent: Deno.RequestEvent | null = await httpConn.nextRequest();
-    if (!requestEvent) {
-      return this.state.transitionTo("accept next connection");
-    }
-    const req = requestEvent.request;
-    const upgrade = req.headers.get("upgrade") || "";
-    if (upgrade.toLowerCase() !== "websocket") {
-      await requestEvent.respondWith(
-        new Response(null, {
-          status: 400,
-        }),
-      );
-      return this.state.transitionTo("accept next connection");
-    }
-    const webSocketUpgrade: Deno.WebSocketUpgrade = Deno
-      .upgradeWebSocket(req);
-    const ws: WebSocket = webSocketUpgrade.socket;
-    ws.addEventListener("open", () => {
-      this.clients.add(ws);
-    });
-    ws.addEventListener("close", () => {
-      this.clients.delete(ws);
-    });
-    await requestEvent.respondWith(webSocketUpgrade.response);
+    const connPromise = this.handleConn(conn);
+    this.handleConnPromises.add(connPromise.finally(() => {
+      this.handleConnPromises.delete(connPromise);
+    }));
     return this.state.transitionTo("accept next connection");
   }
 
-  private cleanup() {
+  private async handleConn(conn: Conn) {
+    const httpConn: Deno.HttpConn = Deno.serveHttp(conn);
+
+    for await (const requestEvent of httpConn) {
+      const req = requestEvent.request;
+      const upgradeHeader = req.headers.get("upgrade") || "";
+      if (upgradeHeader.toLowerCase() !== "websocket") {
+        await requestEvent.respondWith(
+          new Response(null, {
+            status: 400,
+          }),
+        );
+        return this.state.transitionTo("accept next connection");
+      }
+      const upgrade: Deno.WebSocketUpgrade = Deno.upgradeWebSocket(req);
+      const ws: WebSocket = upgrade.socket;
+      ws.addEventListener("open", () => {
+        this.clients.add(ws);
+      });
+      ws.addEventListener("close", () => {
+        this.clients.delete(ws);
+      });
+      await requestEvent.respondWith(upgrade.response);
+    }
+  }
+
+  private async handleRequestEvent(requestEvent: Deno.RequestEvent) {
+  }
+
+  private async cleanup() {
     this.listener?.close();
     this.listener = undefined;
     this.ws?.close();
     this.ws = undefined;
     this.clients.forEach((ws) => safely(() => ws.close()));
     this.clients.clear();
+    for (const p of this.handleConnPromises) {
+      await p.catch(() => undefined);
+    }
   }
 
-  private clientWannabe() {
-    this.cleanup();
+  private async clientWannabe() {
+    await this.cleanup();
     return this.state.transitionTo("connect client");
   }
 
-  private serverFailed() {
-    this.cleanup();
+  private async serverFailed() {
+    await this.cleanup();
     return this.state.transitionTo("server failed");
   }
 
