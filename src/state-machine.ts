@@ -171,7 +171,9 @@ export class StateMachine<
      * @param fn transition function
      */
     function arrow(
-      { to, fn }: Pick<TransitionDefinition<S>, "to" | "fn">,
+      { to, fn }:
+        & Pick<TransitionDefinition<S>, "to">
+        & Partial<Pick<TransitionDefinition<S>, "fn">>,
     ): string {
       const modifiers: string[] = [];
       if (finalStates.includes(to)) {
@@ -186,15 +188,40 @@ export class StateMachine<
       return `-[${modifiers.join()}]->`;
     }
 
+    function unbound(name = ""): string {
+      return name.replace(/^bound /g, "");
+    }
+
+    /**
+     * Returns the name of the transition function, uncamelcased.
+     * Example:
+     *   "startListening" -> "start listening"
+     * @param name
+     */
+    function unCamelCase(name = ""): string {
+      return name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
+    }
+
     /**
      * Returns the note to use for the transition. If the transition has a
      * description, it is used. Otherwise, an empty string is returned.
-     * @param description
+     * @param description transition description
+     * @param fn transition function
      */
-    function note(description: TransitionDefinition<S>["description"]): string {
+    function note(
+      { description, fn }: Partial<
+        Pick<TransitionDefinition<S>, "description" | "fn">
+      >,
+    ): string {
       if (typeof description === "string" && description.length > 0) {
         return `: ${description.replace(/"/g, "'")}`;
       }
+      if (
+        fn !== undefined && fn !== noop && unbound(fn?.name).length > 0
+      ) {
+        return `: ${unCamelCase(unbound(fn.name))}`;
+      }
+
       return "";
     }
 
@@ -235,7 +262,7 @@ export class StateMachine<
       ...transitions.map(
         ({ from, to, description, fn }: TransitionDefinition<S>) =>
           `${short(from)} ${arrow({ to, fn })} ${short(to)}${
-            note(description)
+            note({ description, fn })
           }`,
       ),
 

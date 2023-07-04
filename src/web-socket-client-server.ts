@@ -31,7 +31,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   private outgoingMessages: LocalMultiplexMessage[] = [];
   readonly url: IdUrl;
 
-  private serverListen() {
+  private startListening() {
     const port: number = getPortNumber(this.url);
     try {
       this.listener = Deno.listen({
@@ -99,8 +99,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         {
           from: "server wannabe",
           to: "server listen",
-          description: "start listening",
-          fn: this.serverListen.bind(this),
+          fn: this.startListening.bind(this),
         },
         {
           from: "server listen",
