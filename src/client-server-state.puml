@@ -16,15 +16,25 @@ state "client starting" as client_starting
 state "client failed" as client_failed
 [*] --> server_wannabe
 server_wannabe --> server_starting: start listening
+server_wannabe --> closed: should close
 server_starting --> server_collision: address in use
 server_starting --> server: listening
 server_starting --> server_failed: other error
+server_starting --> closed: should close
 server_collision --> client_wannabe: !closed
+server_collision --> closed: should close
 server --> server_failed: fatal error
+server --> closed: should close
 server_failed --> client_wannabe: !closed
+server_failed --> closed: should close
 client_wannabe --> client_starting: start connecting
+client_wannabe --> closed: should close
 client_starting --> client: connected
 client_starting --> client_failed: could not
+client_starting --> closed: should close
 client --> client_failed: fatal error
+client --> closed: should close
 client_failed --> server_wannabe: !closed
+client_failed --> closed: should close
+closed --> closed: already closed
 @enduml

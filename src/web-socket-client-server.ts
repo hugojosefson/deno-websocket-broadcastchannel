@@ -1,4 +1,3 @@
-import { WebSocketServer } from "./web-socket-server.ts";
 import { Logger, logger } from "./log.ts";
 import { IdUrl } from "./id-url.ts";
 import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
@@ -25,6 +24,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   private readonly log1: Logger;
   readonly channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
   private readonly state: StateMachine<ClientServerState>;
+  private shouldClose = false;
   private listener?: Deno.Listener;
   private readonly clients: Set<WebSocket> = new Set<WebSocket>();
   private ws?: WebSocket;
@@ -39,13 +39,45 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           from: "server wannabe",
           to: "server starting",
           description: "start listening",
-          fn: async () => {
+          fn: () => {
             const port: number = getPortNumber(this.url);
-            this.listener = Deno.listen({
-              port,
-              transport: "tcp",
-              hostname: this.url.hostname,
-            });
+            try {
+              this.listener = Deno.listen({
+                port,
+                transport: "tcp",
+                hostname: this.url.hostname,
+              });
+            } catch (e) {
+              if (e instanceof Deno.errors.AddrInUse) {
+                return this.state.transitionTo("server collision");
+              } else {
+                return this.state.transitionTo("server failed");
+              }
+            }
+          },
+        },
+        {
+          from: "server starting",
+          to: "server collision",
+          description: "address in use",
+          fn: () => {
+            this.listener?.close();
+            this.listener = undefined;
+
+            const next: ClientServerState = this.shouldClose
+              ? "closed"
+              : "client wannabe";
+            return this.state.transitionTo(next);
+          },
+        },
+        {
+          from: "server starting",
+          to: "server",
+          description: "listening",
+          fn: async () => {
+            if (!this.listener) {
+              return this.state.transitionTo("server failed");
+            }
             for await (const conn of this.listener) {
               const httpConn: Deno.HttpConn = Deno.serveHttp(conn);
               for await (const requestEvent of httpConn) {
@@ -72,16 +104,6 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
               }
             }
           },
-        },
-        {
-          from: "server starting",
-          to: "server collision",
-          description: "address in use",
-        },
-        {
-          from: "server starting",
-          to: "server",
-          description: "listening",
         },
         {
           from: "server starting",
@@ -172,6 +194,11 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           from: "server",
           to: "closed",
           description: "should close",
+        },
+        {
+          from: "closed",
+          to: "closed",
+          description: "already closed",
         },
       ],
     );
