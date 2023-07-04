@@ -1,4 +1,5 @@
 import { s } from "./fn.ts";
+import { PromiseQueue } from "./promise-queue.ts";
 
 export interface TransitionDefinition<S> {
   from: S;
@@ -8,9 +9,12 @@ export interface TransitionDefinition<S> {
 }
 
 export type ErrorResponse = void | never | Promise<void | never>;
-export type OnTransition<S> = Fn<S, void|Promise<void>>;
+export type OnTransition<S> = Fn<S, void | Promise<void>>;
 export type Fn<S, R> = (transition: TransitionDefinition<S>) => R;
-export type OnDisallowedTransition<S, E extends ErrorResponse> = (from: S, to: S) => E;
+export type OnDisallowedTransition<S, E extends ErrorResponse> = (
+  from: S,
+  to: S,
+) => E;
 
 function noop<S>(): void {}
 
@@ -23,6 +27,7 @@ export class StateMachine<
   private _state: S;
   private readonly onDisallowedTransition: OnDisallowedTransition<S, E>;
   private readonly transitions: Map<S, Map<S, TransitionMeta<S>>> = new Map();
+  private readonly promiseQueue: PromiseQueue = new PromiseQueue();
 
   constructor(
     initialState: S,
@@ -50,11 +55,33 @@ export class StateMachine<
       to,
       ...this.getAnyTransitionMeta(to),
     };
+
+    /** enqueue transition if another transition is in progress */
+    if (this.promiseQueue.isWaiting) {
+      return this.promiseQueue.enqueue(async () => {
+        await this.transitionTo(to);
+      });
+    }
+    // otherwise, go ahead and transition
+
+    /** check if transition is allowed */
     if (transition.fn === undefined) {
       return this.onDisallowedTransition(this._state, to);
     }
+
+    /** transition */
     this._state = to;
-    return transition.fn(transition);
+
+    /** run transition function */
+    const fn = transition.fn;
+    const result = fn(transition);
+    /** if transition function returns a Promise, enqueue it */
+    if (result instanceof Promise) {
+      return this.promiseQueue.enqueue(async () => {
+        await result;
+      });
+    }
+    return result;
   }
 
   get state(): S {

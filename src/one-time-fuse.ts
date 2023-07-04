@@ -14,7 +14,11 @@ export class OneTimeFuse {
     this.blown = new StateMachine<boolean>(
       false,
       [
-        [false, true],
+        {
+          from: false,
+          to: true,
+          description: "blow the fuse",
+        },
       ],
       (): never => {
         throw new this.errorConstructor(this.errorMessage);
