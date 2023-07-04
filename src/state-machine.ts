@@ -6,9 +6,11 @@ export interface TransitionDefinition<S> {
   fn?: OnTransition<S>;
   description?: string;
 }
-export type OnTransition<S> = Fn<S, void>;
-export type Fn<S, T> = (transition: TransitionDefinition<S>) => T;
-export type OnDisallowedTransition<S, E> = (from: S, to: S) => E;
+
+export type ErrorResponse = void | never | Promise<void | never>;
+export type OnTransition<S> = Fn<S, void|Promise<void>>;
+export type Fn<S, R> = (transition: TransitionDefinition<S>) => R;
+export type OnDisallowedTransition<S, E extends ErrorResponse> = (from: S, to: S) => E;
 
 function noop<S>(): void {}
 
@@ -16,7 +18,7 @@ type TransitionMeta<S> = Pick<TransitionDefinition<S>, "fn" | "description">;
 
 export class StateMachine<
   S,
-  E extends (void | never) = never,
+  E extends ErrorResponse = never,
 > {
   private _state: S;
   private readonly onDisallowedTransition: OnDisallowedTransition<S, E>;
@@ -42,7 +44,7 @@ export class StateMachine<
     }
   }
 
-  transitionTo(to: S): E | void {
+  transitionTo(to: S): E | void | Promise<void> {
     const transition: TransitionDefinition<S> = {
       from: this._state,
       to,
@@ -52,7 +54,7 @@ export class StateMachine<
       return this.onDisallowedTransition(this._state, to);
     }
     this._state = to;
-    transition.fn(transition);
+    return transition.fn(transition);
   }
 
   get state(): S {
@@ -71,11 +73,7 @@ export class StateMachine<
   }
 
   /**
-   * Returns a PlantUML state machine diagram.
-   *
-   * Specifically marks the final state with a double circle.
-   *
-   * Marks the initial state (as read from this._state) with a star.
+   * Returns this state machine's PlantUML diagram.
    */
   toPlantUml(title?: string, includeFinal = true): string {
     function short(state: S): string {
@@ -108,7 +106,7 @@ export class StateMachine<
     const initial: S = this._state;
     const finalStates: S[] = states.filter((state: S) => this.isFinal(state));
 
-    // splice out the final states from the states list, and the transitions
+    /** splice out the final states from the states list, and the transitions */
     if (!includeFinal) {
       for (const finalState of finalStates) {
         const index = states.indexOf(finalState);
@@ -128,6 +126,12 @@ export class StateMachine<
       finalStates.splice(0, finalStates.length);
     }
 
+    /**
+     * Returns the arrow to use for the transition. Final states are marked with
+     * a dotted arrow.
+     * @param _from from state, unused for now
+     * @param to to state
+     */
     function arrow(_from: S, to: S): string {
       if (finalStates.includes(to)) {
         return "-[dotted]->";
@@ -135,6 +139,11 @@ export class StateMachine<
       return "-->";
     }
 
+    /**
+     * Returns the note to use for the transition. If the transition has a
+     * description, it is used. Otherwise, an empty string is returned.
+     * @param description
+     */
     function note(description: TransitionDefinition<S>["description"]): string {
       if (typeof description === "string" && description.length > 0) {
         return `: ${description.replace(/"/g, "'")}`;
@@ -142,6 +151,9 @@ export class StateMachine<
       return "";
     }
 
+    /**
+     * Renders the PlantUML state machine diagram.
+     */
     return [
       "@startuml",
       "hide empty description",

@@ -30,9 +30,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   private outgoingMessages: LocalMultiplexMessage[] = [];
   readonly url: IdUrl;
 
-  createClientServerStateMachine(): StateMachine<
-    ClientServerState
-  > {
+  createClientServerStateMachine(): StateMachine<ClientServerState> {
     return new StateMachine<ClientServerState>(
       "server wannabe",
       [
