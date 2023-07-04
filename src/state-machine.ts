@@ -15,6 +15,10 @@ export type OnDisallowedTransition<S, E extends ErrorResponse> = (
   from: S,
   to: S,
 ) => E;
+export type OnBeforeTransition<S> = (
+  transition: TransitionDefinition<S>,
+  createTransition: (to: S) => TransitionDefinition<S>,
+) => TransitionDefinition<S>;
 
 function noop<S>(): void {}
 
@@ -26,20 +30,23 @@ export class StateMachine<
 > {
   private _state: S;
   private readonly onDisallowedTransition: OnDisallowedTransition<S, E>;
+  private readonly onBeforeTransition: OnBeforeTransition<S>;
   private readonly transitions: Map<S, Map<S, TransitionMeta<S>>> = new Map();
   private readonly promiseQueue: PromiseQueue = new PromiseQueue();
 
   constructor(
     initialState: S,
-    allowedTransitions: TransitionDefinition<S>[] = [],
+    onBeforeTransition: OnBeforeTransition<S> = (transition) => transition,
     onDisallowedTransition: OnDisallowedTransition<S, E> = (from: S, to: S) => {
       throw new Error(
         `Transition from ${s(from)} to ${s(to)} is not allowed.`,
       );
     },
+    allowedTransitions: TransitionDefinition<S>[] = [],
   ) {
     this._state = initialState;
     this.onDisallowedTransition = onDisallowedTransition;
+    this.onBeforeTransition = onBeforeTransition;
 
     for (const transition of allowedTransitions) {
       this.setTransition({
@@ -49,12 +56,16 @@ export class StateMachine<
     }
   }
 
-  transitionTo(to: S): E | void | Promise<void> {
-    const transition: TransitionDefinition<S> = {
+  createTransition(to: S): TransitionDefinition<S> {
+    return {
       from: this._state,
       to,
       ...this.getAnyTransitionMeta(to),
     };
+  }
+
+  transitionTo(to: S): E | void | Promise<void> {
+    let transition: TransitionDefinition<S> = this.createTransition(to);
 
     /** enqueue transition if another transition is in progress */
     if (this.promiseQueue.isWaiting) {
@@ -63,6 +74,12 @@ export class StateMachine<
       });
     }
     // otherwise, go ahead and transition
+
+    /** possibly override transition */
+    transition = this.onBeforeTransition(
+      transition,
+      this.createTransition.bind(this),
+    );
 
     /** check if transition is allowed */
     if (transition.fn === undefined) {

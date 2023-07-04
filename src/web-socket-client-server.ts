@@ -34,6 +34,9 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   createClientServerStateMachine(): StateMachine<ClientServerState> {
     return new StateMachine<ClientServerState>(
       "server wannabe",
+      (transition, createTransition) =>
+        this.shouldClose ? createTransition("closed") : transition,
+      undefined,
       [
         {
           from: "server wannabe",
@@ -48,12 +51,11 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
                 hostname: this.url.hostname,
               });
             } catch (e) {
-              const next: ClientServerState = this.shouldClose
-                ? "closed"
-                : e instanceof Deno.errors.AddrInUse
-                ? "server collision"
-                : "server failed";
-              return this.state.transitionTo(next);
+              return this.state.transitionTo(
+                e instanceof Deno.errors.AddrInUse
+                  ? "server collision"
+                  : "server failed",
+              );
             }
           },
         },
@@ -64,45 +66,52 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           fn: () => {
             this.listener?.close();
             this.listener = undefined;
-
-            const next: ClientServerState = this.shouldClose
-              ? "closed"
-              : "client wannabe";
-            return this.state.transitionTo(next);
+            return this.state.transitionTo("client wannabe");
           },
         },
         {
           from: "server starting",
           to: "server",
           description: "listening",
-          fn: async () => {
+          fn: () => {
             if (!this.listener) {
               return this.state.transitionTo("server failed");
             }
-            for await (const conn of this.listener) {
-              const httpConn: Deno.HttpConn = Deno.serveHttp(conn);
-              for await (const requestEvent of httpConn) {
-                const req = requestEvent.request;
-                const upgrade = req.headers.get("upgrade") || "";
-                if (upgrade.toLowerCase() !== "websocket") {
-                  await requestEvent.respondWith(
-                    new Response(null, {
-                      status: 400,
-                    }),
-                  );
-                  continue;
-                }
-                const webSocketUpgrade: Deno.WebSocketUpgrade = Deno
-                  .upgradeWebSocket(req);
-                const ws: WebSocket = webSocketUpgrade.socket;
-                ws.addEventListener("open", () => {
-                  this.clients.add(ws);
-                });
-                ws.addEventListener("close", () => {
-                  this.clients.delete(ws);
-                });
-                await requestEvent.respondWith(webSocketUpgrade.response);
+          },
+        },
+        {
+          from: "server",
+          to: "server",
+          description: "next connection",
+          fn: async () => {
+            const conn = await this.listener?.accept();
+            if (!conn) {
+              return this.state.transitionTo("server failed");
+            }
+            // are we hanging here?
+            // can we accept multiple connections? multiple requests?
+            const httpConn: Deno.HttpConn = Deno.serveHttp(conn);
+            for await (const requestEvent of httpConn) {
+              const req = requestEvent.request;
+              const upgrade = req.headers.get("upgrade") || "";
+              if (upgrade.toLowerCase() !== "websocket") {
+                await requestEvent.respondWith(
+                  new Response(null, {
+                    status: 400,
+                  }),
+                );
+                continue;
               }
+              const webSocketUpgrade: Deno.WebSocketUpgrade = Deno
+                .upgradeWebSocket(req);
+              const ws: WebSocket = webSocketUpgrade.socket;
+              ws.addEventListener("open", () => {
+                this.clients.add(ws);
+              });
+              ws.addEventListener("close", () => {
+                this.clients.delete(ws);
+              });
+              await requestEvent.respondWith(webSocketUpgrade.response);
             }
           },
         },
