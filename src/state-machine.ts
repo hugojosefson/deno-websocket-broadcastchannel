@@ -347,7 +347,9 @@ export class StateMachine<
       ),
 
       "@enduml",
-    ].join("\n");
+    ]
+      .map((line) => line.trim())
+      .join("\n");
   }
 
   private escapePlantUmlString(str?: string): string {

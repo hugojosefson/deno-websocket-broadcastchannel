@@ -25,15 +25,15 @@ state "client failed"  as client_failed
 
 [*]            -->              init
 init           -[thickness=2]-> start_server   : cleanup, start server,  → server
-start_server   -[thickness=2]-> address_in_use 
-start_server   -[thickness=2]-> server_failed  
+start_server   -[thickness=2]-> address_in_use
+start_server   -[thickness=2]-> server_failed
 start_server   -[thickness=2]-> server         : hook up server event listeners
-server         -[thickness=2]-> server_failed  
-address_in_use -[thickness=2]-> client_wannabe 
-server_failed  -[thickness=2]-> client_wannabe 
+server         -[thickness=2]-> server_failed
+address_in_use -[thickness=2]-> client_wannabe
+server_failed  -[thickness=2]-> client_wannabe
 client_wannabe -->              connect_client : start connecting
 connect_client -->              client         : connected
 connect_client -->              client_failed  : could not
-client         -[thickness=2]-> client_failed  
-client_failed  -->              init           
+client         -[thickness=2]-> client_failed
+client_failed  -->              init
 @enduml
