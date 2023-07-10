@@ -6,11 +6,11 @@ import {
 import {
   assertEquals,
   assertInstanceOf,
-  // assertStrictEquals,
+  assertStrictEquals,
 } from "https://deno.land/std@0.192.0/testing/asserts.ts";
 import { getAvailablePort } from "./get-available-port.ts";
 import { defaultWebSocketUrl } from "../src/default-websocket-url.ts";
-import { assertDifferentInstances /* , rejectOnTimeout */ } from "./fn.ts";
+import { assertDifferentInstances, rejectOnTimeout } from "./fn.ts";
 // import { deferred } from "https://deno.land/std@0.192.0/async/deferred.ts";
 import { using } from "../src/using.ts";
 import { Manager, WebSocketBroadcastChannel } from "../mod.ts";
@@ -44,30 +44,30 @@ describe("websocket-broadcastchannel", () => {
           },
         );
       });
-      // it("should send one message from each, to the other", async () => {
-      //   await using(
-      //     [
-      //       () => manager.createBroadcastChannel("chat", url),
-      //       () => manager.createBroadcastChannel("chat", url),
-      //     ],
-      //     async ([bc0, bc1]) => {
-      //       const receivedPromise0 = new Promise<string>((resolve) => {
-      //         bc0.onmessage = (e) => resolve(e.data);
-      //       });
-      //       const receivedPromise1 = new Promise<string>((resolve) => {
-      //         bc1.onmessage = (e) => resolve(e.data);
-      //       });
-      //       bc0.postMessage("test from bc0");
-      //       bc1.postMessage("test from bc1");
-      //       const [received0, received1] = await rejectOnTimeout([
-      //         receivedPromise0,
-      //         receivedPromise1,
-      //       ]);
-      //       assertStrictEquals(received0, "test from bc1");
-      //       assertStrictEquals(received1, "test from bc0");
-      //     },
-      //   );
-      // });
+      it("should send one message from each, to the other", async () => {
+        await using(
+          [
+            () => manager.createBroadcastChannel("chat", url),
+            () => manager.createBroadcastChannel("chat", url),
+          ],
+          async ([bc0, bc1]) => {
+            const receivedPromise0 = new Promise<string>((resolve) => {
+              bc0.onmessage = (e) => resolve(e.data);
+            });
+            const receivedPromise1 = new Promise<string>((resolve) => {
+              bc1.onmessage = (e) => resolve(e.data);
+            });
+            bc0.postMessage("test from bc0");
+            bc1.postMessage("test from bc1");
+            const [received0, received1] = await rejectOnTimeout([
+              receivedPromise0,
+              receivedPromise1,
+            ]);
+            assertStrictEquals(received0, "test from bc1");
+            assertStrictEquals(received1, "test from bc0");
+          },
+        );
+      });
     });
     // describe("3 instances, same channel name", () => {
     //   it("should create them", async () => {

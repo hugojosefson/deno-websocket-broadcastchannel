@@ -282,7 +282,9 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
       if (channel === message.from) {
         continue;
       }
-      channel.postMessage(message.message);
+      channel.dispatchEvent(
+        new MessageEvent("message", { data: message.message }),
+      );
     }
   }
 }
