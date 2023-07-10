@@ -78,25 +78,27 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   }
 
   private sendOutgoingMessages() {
-    while (this.shouldSendOutgoingMessage()) {
-      this.doSendOutgoingMessage();
+    for (const message of this.outgoingMessagesToSend()) {
+      this.doSendOutgoingMessage(message);
     }
   }
 
-  private shouldSendOutgoingMessage() {
-    const notAborted = !this.abortController.signal.aborted;
-    const inRelevantState = this.state.is("client") || this.state.is("server");
-    const haveMessages = this.outgoingMessages.length > 0;
-    return notAborted && haveMessages && inRelevantState;
+  private doSendOutgoingMessage(message: LocalMultiplexMessage) {
+    const data: string = JSON.stringify(message);
+    this.ws?.send(data);
+    this.server?.broadcast(data);
   }
 
-  private doSendOutgoingMessage() {
-    const message: LocalMultiplexMessage | undefined = this.outgoingMessages
-      .shift();
-    if (message) {
-      const data: string = JSON.stringify(message);
-      this.ws?.send(data);
-      this.server?.broadcast(data);
+  private *outgoingMessagesToSend(): Generator<LocalMultiplexMessage> {
+    while (
+      !this.abortController.signal.aborted &&
+      this.outgoingMessages.length > 0 &&
+      this.state.is("client", "server")
+    ) {
+      const message = this.outgoingMessages.shift();
+      if (message !== undefined) {
+        yield message;
+      }
     }
   }
 

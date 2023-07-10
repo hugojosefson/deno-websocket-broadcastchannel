@@ -434,7 +434,11 @@ export class StateMachine<
     return fn;
   }
 
-  is(state: S) {
-    return this._state === state;
+  /**
+   * Checks if current state is any of the arguments.
+   * @param either
+   */
+  is(...either: S[]): boolean {
+    return either.includes(this._state);
   }
 }
