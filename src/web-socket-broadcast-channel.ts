@@ -1,14 +1,8 @@
 import { s } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
 import { WebSocketClientServer } from "./web-socket-client-server.ts";
-import {
-  extractAnyMultiplexMessage,
-  LocalMultiplexMessage,
-  MultiplexMessage,
-} from "./multiplex-message.ts";
+import { LocalMultiplexMessage } from "./multiplex-message.ts";
 import { BroadcastChannelIsh } from "./types.ts";
-import { defaultWebSocketUrl } from "./default-websocket-url.ts";
-import { IdUrl } from "./id-url.ts";
 import { Disposable, Symbol } from "./using.ts";
 import { OneTimeFuse } from "./one-time-fuse.ts";
 import { IdUrlChannel } from "./id-url-channel.ts";
@@ -40,6 +34,7 @@ export class WebSocketBroadcastChannel extends EventTarget
   onmessage: ((ev: Event) => void) | null = null;
   onmessageerror: ((ev: Event) => void) | null = null;
   private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
+  private readonly clientServer: WebSocketClientServer;
   private closeFuse = new OneTimeFuse("channel is already closed");
   get name(): string {
     return this.idUrlChannel.channel;
@@ -64,59 +59,44 @@ export class WebSocketBroadcastChannel extends EventTarget
       (e: Event) => this.onmessageerror?.(e),
     );
 
-    clientServer.registerChannel(this);
+    this.clientServer = clientServer;
   }
   postMessage(message: string): void {
     const log1 = this.log.sub(
-      WebSocketBroadcastChannel.prototype.postMessage.name,
+      this.clientServer.constructor.prototype.postMessage.name,
     );
     log1(`message: ${s(message)}`);
-    if (this.closeFuse.isBlown()) {
+    if (this.closeFuse.isBlown) {
       log1("channel is closed; not posting message.");
       return;
     }
 
     const localMultiplexMessage = new LocalMultiplexMessage(this, message);
     log1(
-      `${ensureClientServer.name}(${
+      `this.clientServer(${
         s(this.url)
-      }).${WebSocketClientServer.prototype.postMessage.name}(${
+      }).${this.clientServer.constructor.prototype.postMessage.name}(${
         s(localMultiplexMessage)
       })`,
     );
-    ensureClientServer(this.url).postMessage(localMultiplexMessage);
+    this.clientServer.postMessage(localMultiplexMessage);
   }
   [Symbol.dispose](): void {
     const log1 = this.log.sub(
-      WebSocketBroadcastChannel.prototype[Symbol.dispose].name,
+      this.constructor.prototype[Symbol.dispose].name,
     );
     log1("disposing channel, via close()...");
     this.close();
   }
   close(): void {
-    const log1 = this.log.sub(WebSocketBroadcastChannel.prototype.close.name);
+    const log1 = this.log.sub(this.constructor.prototype.close.name);
+    if (this.closeFuse.isBlown) {
+      log1("channel already closed.");
+      return;
+    }
     log1("closing channel...");
     this.closeFuse.blow();
     log1("dispatching close event...");
     this.dispatchEvent(new CloseEvent("close"));
-  }
-}
-
-const clientServers: Map<IdUrl, WebSocketClientServer> = new Map();
-
-function possiblyUnregisterClientServer(clientServer: WebSocketClientServer) {
-  const log = log0.sub(possiblyUnregisterClientServer.name);
-  log("clientServer:", !!clientServer);
-  if (clientServer !== undefined) {
-    log("clientServer !== undefined; checking if it should be unregistered...");
-    log("clientServer.channelSets.size:", clientServer.channelSets.size);
-    if (clientServer.channelSets.size === 0) {
-      log("channelSets.size === 0; closing clientServer...");
-      clientServer.close();
-      log("setting clientServer = undefined");
-      clientServers.delete(clientServer.url);
-    } else {
-      log("channelSets.size !== 0; not closing clientServer.");
-    }
   }
 }

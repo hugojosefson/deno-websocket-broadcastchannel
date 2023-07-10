@@ -9,7 +9,7 @@ if (import.meta.main) {
     new URL("./client-server-state.puml", import.meta.url).pathname,
     sm.toPlantUml(
       `${WebSocketClientServer.name}\nState Machine`,
-      false,
+      true,
     ),
   );
 }

@@ -64,7 +64,7 @@ function to create the relevant `BroadcastChannel` object, and then uses the
 `BroadcastChannel` API as usual.
 
 ```typescript
-import { createBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
+import { Manager } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
 
 const pid = Deno.pid;
 const pidLastDigit = pid % 10;
@@ -77,7 +77,7 @@ const log = (s: string, ...args: unknown[]) => {
 log("run this in multiple terminals on the same host, to see it work");
 
 log("starting...");
-const testChannel = await createBroadcastChannel("test");
+const testChannel = new Manager().createBroadcastChannel("test");
 log("testChannel.constructor.name", testChannel.constructor.name);
 
 testChannel.onmessage = (event: MessageEvent<unknown>) => {
@@ -119,11 +119,11 @@ Adapted to use this module:
 
 ```typescript
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-import { createBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
+import { Manager } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
 
 const messages: string[] = [];
 // Create a new broadcast channel named earth.
-const channel = await createBroadcastChannel("earth");
+const channel = new Manager().createBroadcastChannel("earth");
 // Set onmessage event handler.
 channel.onmessage = (event: MessageEvent) => {
   // Update the local state when other instances
@@ -178,9 +178,9 @@ function to create the relevant `BroadcastChannel` object, and then uses the
 ```typescript
 import {
   BroadcastChannelIsh,
-  createBroadcastChannel,
   Logger,
   logger,
+  Manager,
   WebSocketBroadcastChannel,
 } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
 const log: Logger = logger(import.meta.url);
@@ -190,7 +190,9 @@ const log: Logger = logger(import.meta.url);
  */
 async function main() {
   log("Starting...");
-  const chat: BroadcastChannelIsh = await createBroadcastChannel("chat");
+  const chat: BroadcastChannelIsh = new Manager().createBroadcastChannel(
+    "chat",
+  );
 
   if (chat instanceof WebSocketBroadcastChannel) {
     console.error(`

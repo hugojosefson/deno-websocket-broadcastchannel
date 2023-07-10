@@ -1,5 +1,5 @@
 #!/usr/bin/env -S deno run --allow-net --watch
-import { createBroadcastChannel } from "../mod.ts";
+import { Manager } from "../mod.ts";
 
 const pid = Deno.pid;
 const pidLastDigit = pid % 10;
@@ -12,7 +12,7 @@ const log = (s: string, ...args: unknown[]) => {
 log("run this in multiple terminals on the same host, to see it work");
 
 log("starting...");
-const testChannel = await createBroadcastChannel("test");
+const testChannel = new Manager().createBroadcastChannel("test");
 log("testChannel.constructor.name", testChannel.constructor.name);
 
 testChannel.onmessage = (event: MessageEvent<unknown>) => {

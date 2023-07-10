@@ -45,8 +45,19 @@ export class Manager {
       }
     }
     // Instantiate a WebSocketBroadcastChannel.
-    const clientServer = this.ensureClientServer(IdUrl.of(url));
-    return new WebSocketBroadcastChannel(clientServer, name);
+    const clientServer: WebSocketClientServer = this.ensureClientServer(
+      IdUrl.of(url),
+    );
+    const broadcastChannel = new WebSocketBroadcastChannel(clientServer, name);
+    clientServer.registerChannel(broadcastChannel);
+    broadcastChannel.addEventListener("close", () => {
+      clientServer.unregisterChannel(broadcastChannel);
+      if (clientServer.channelSets.size) {
+        clientServer.close();
+        this.clientServers.delete(clientServer.url);
+      }
+    });
+    return broadcastChannel;
   }
 
   private ensureClientServer(url: IdUrl): WebSocketClientServer {

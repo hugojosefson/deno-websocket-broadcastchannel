@@ -1,10 +1,10 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env=PORT --watch
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-import { createBroadcastChannel } from "../mod.ts";
+import { Manager } from "../mod.ts";
 
 const messages: string[] = [];
 // Create a new broadcast channel named earth.
-const channel = await createBroadcastChannel("earth");
+const channel = new Manager().createBroadcastChannel("earth");
 // Set onmessage event handler.
 channel.onmessage = (event: MessageEvent) => {
   // Update the local state when other instances

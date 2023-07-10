@@ -22,18 +22,30 @@ state "client wannabe" as client_wannabe
 state "connect client" as connect_client
 state "client"         as client
 state "client failed"  as client_failed
+state "closed"         as closed
 
-[*]            -->              server_wannabe
-server_wannabe -[thickness=5]-> start_server   : cleanup, start server,  → server
-start_server   -[thickness=2]-> address_in_use
-start_server   -[thickness=2]-> server_failed
-start_server   -[thickness=5]-> server         : send outgoing messages
-server         -[thickness=2]-> server_failed
-address_in_use -[thickness=2]-> client_wannabe
-server_failed  -[thickness=2]-> client_wannabe
-client_wannabe -[thickness=5]-> connect_client : cleanup, start connecting
-connect_client -[thickness=5]-> client         : send outgoing messages
-connect_client -[thickness=2]-> client_failed
-client         -[thickness=2]-> client_failed
-client_failed  -[thickness=2]-> server_wannabe
+[*]            -->                     server_wannabe
+server_wannabe -[thickness=5]->        start_server   : cleanup, start server,  → server
+server_wannabe -[dotted,thickness=5]-> closed         : close
+start_server   -[thickness=2]->        address_in_use
+start_server   -[thickness=2]->        server_failed
+start_server   -[thickness=5]->        server         : send outgoing messages
+start_server   -[dotted,thickness=5]-> closed         : close
+server         -[thickness=2]->        server_failed
+server         -[dotted,thickness=5]-> closed         : close
+address_in_use -[thickness=2]->        client_wannabe
+address_in_use -[dotted,thickness=5]-> closed         : close
+server_failed  -[thickness=2]->        client_wannabe
+server_failed  -[dotted,thickness=5]-> closed         : close
+client_wannabe -[thickness=5]->        connect_client : cleanup, start connecting
+client_wannabe -[dotted,thickness=5]-> closed         : close
+connect_client -[thickness=5]->        client         : send outgoing messages
+connect_client -[thickness=2]->        client_failed
+connect_client -[dotted,thickness=5]-> closed         : close
+client         -[thickness=2]->        client_failed
+client         -[dotted,thickness=5]-> closed         : close
+client_failed  -[thickness=2]->        server_wannabe
+client_failed  -[dotted,thickness=5]-> closed         : close
+closed         -[dotted]->             closed         : already closed
+closed         -[dotted]->             [*]
 @enduml

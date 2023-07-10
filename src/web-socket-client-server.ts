@@ -106,7 +106,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     return new StateMachine<ClientServerState>(
       "server wannabe",
       (transition, createTransition) =>
-        this.abortController.signal.aborted
+        (this.abortController.signal.aborted || this.state.is("closed"))
           ? createTransition("closed")
           : transition,
       undefined,
@@ -174,42 +174,47 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         {
           from: "client failed",
           to: "closed",
-          description: "aborted",
+          fn: this.close.bind(this),
         },
         {
           from: "connect client",
           to: "closed",
-          description: "aborted",
+          fn: this.close.bind(this),
         },
         {
           from: "client wannabe",
           to: "closed",
-          description: "aborted",
+          fn: this.close.bind(this),
         },
         {
           from: "client",
           to: "closed",
-          description: "aborted",
+          fn: this.close.bind(this),
         },
         {
           from: "address in use",
           to: "closed",
-          description: "aborted",
+          fn: this.close.bind(this),
+        },
+        {
+          from: "server",
+          to: "closed",
+          fn: this.close.bind(this),
         },
         {
           from: "server failed",
           to: "closed",
-          description: "aborted",
+          fn: this.close.bind(this),
         },
         {
           from: "start server",
           to: "closed",
-          description: "aborted",
+          fn: this.close.bind(this),
         },
         {
           from: "server wannabe",
           to: "closed",
-          description: "aborted",
+          fn: this.close.bind(this),
         },
         {
           from: "closed",
@@ -225,15 +230,59 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     this.log1 = log0.sub(WebSocketClientServer.name).sub(url.toString());
     this.url = url;
     this.state = this.createClientServerStateMachine();
-    this.abortController.signal.addEventListener("abort", () => {
-      this.state.transitionTo("closed");
-    });
+    this.abortController.signal.addEventListener(
+      "abort",
+      this.close.bind(this),
+    );
     if (autoStart) {
       this.state.transitionToNextNonFinalState();
     }
   }
 
   [Symbol.dispose](): void {
+    this.close();
+  }
+
+  close(): void {
+    this.cleanup();
     this.state.transitionTo("closed");
+  }
+
+  ensureChannelSet(channelName: string): Set<WebSocketBroadcastChannel> {
+    const existingChannelSet = this.channelSets.get(channelName);
+    if (existingChannelSet) {
+      return existingChannelSet;
+    } else {
+      const channelSet = new Set<WebSocketBroadcastChannel>();
+      this.channelSets.set(channelName, channelSet);
+      return channelSet;
+    }
+  }
+
+  getChannelSetOrEmpty(channelName: string): Set<WebSocketBroadcastChannel> {
+    return this.channelSets.get(channelName) ??
+      new Set<WebSocketBroadcastChannel>();
+  }
+
+  registerChannel(broadcastChannel: WebSocketBroadcastChannel) {
+    this.ensureChannelSet(broadcastChannel.name).add(broadcastChannel);
+  }
+
+  unregisterChannel(broadcastChannel: WebSocketBroadcastChannel) {
+    this.getChannelSetOrEmpty(broadcastChannel.name).delete(broadcastChannel);
+    if (this.getChannelSetOrEmpty(broadcastChannel.name).size === 0) {
+      this.channelSets.delete(broadcastChannel.name);
+    }
+  }
+
+  postMessage(message: LocalMultiplexMessage) {
+    const channelSet: Set<WebSocketBroadcastChannel> = this
+      .getChannelSetOrEmpty(message.channel);
+    for (const channel of channelSet) {
+      if (channel === message.from) {
+        continue;
+      }
+      channel.postMessage(message.message);
+    }
   }
 }

@@ -32,6 +32,12 @@ function noop<S>(): void {}
 
 type TransitionMeta<S> = Pick<TransitionDefinition<S>, "fn" | "description">;
 
+export function defaultOnDisallowedTransition<S>(from: S, to: S): never {
+  throw new Error(
+    `Transition from ${s(from)} to ${s(to)} is not allowed.`,
+  );
+}
+
 export class StateMachine<
   S,
   E extends ErrorResponse = never,
@@ -45,11 +51,8 @@ export class StateMachine<
   constructor(
     initialState: S,
     onBeforeTransition: OnBeforeTransition<S> = (transition) => transition,
-    onDisallowedTransition: OnDisallowedTransition<S, E> = (from: S, to: S) => {
-      throw new Error(
-        `Transition from ${s(from)} to ${s(to)} is not allowed.`,
-      );
-    },
+    onDisallowedTransition: OnDisallowedTransition<S, E> =
+      defaultOnDisallowedTransition<S>,
     allowedTransitions: TransitionDefinition<S>[] = [],
   ) {
     this._state = initialState;
