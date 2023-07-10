@@ -222,8 +222,17 @@ export class StateMachine<
       description = description.trim();
       description = description.replace(/ and goto /g, " → ");
 
-      const availableTransitionsAfterExceptFinalStates: S[] = that
-        .getAvailableTransitions(to).filter((s) => !that.isFinal(s));
+      const availableTransitionsAfter = that.getAvailableTransitions(to);
+      const availableTransitionsAfterExceptFinalStates: S[] =
+        availableTransitionsAfter.filter((s) => !that.isFinal(s));
+
+      console.dir({
+        description,
+        to,
+        availableTransitionsAfter,
+        availableTransitionsAfterExceptFinalStates,
+      });
+
       if (availableTransitionsAfterExceptFinalStates.length === 1) {
         const after: S = availableTransitionsAfterExceptFinalStates[0];
         description = description.replace(`${after}`, "");
@@ -368,5 +377,43 @@ export class StateMachine<
 
   private getAnyTransitionMeta(to: S): TransitionMeta<S> | undefined {
     return this.transitions.get(this._state)?.get(to);
+  }
+
+  transitionToNextState() {
+    const availableTransitions: S[] = this.getAvailableTransitions();
+    if (availableTransitions.length !== 1) {
+      throw new Error(
+        `Expected exactly one available transition from ${
+          s(this._state)
+        }, found ${availableTransitions.length}.`,
+      );
+    }
+    const transition: S = availableTransitions[0];
+    this.transitionTo(transition);
+  }
+
+  transitionToNextNonFinalState() {
+    const availableTransitions: S[] = this.getAvailableTransitions();
+    if (availableTransitions.length === 0) {
+      throw new Error(
+        `Expected at least one available transition from ${
+          s(this._state)
+        }, found none.`,
+      );
+    }
+    const nonFinalTransitions: S[] = availableTransitions.filter(
+      (to: S) => !this.isFinal(to),
+    );
+    if (nonFinalTransitions.length === 0) {
+      throw new Error(
+        `Expected at least one available non-final transition from ${
+          s(
+            this._state,
+          )
+        }, found none.`,
+      );
+    }
+    const transition: S = nonFinalTransitions[0];
+    this.transitionTo(transition);
   }
 }

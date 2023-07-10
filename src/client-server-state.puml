@@ -13,7 +13,7 @@ skinparam StateBorderThickness 2
 
 title "WebSocketClientServer\nState Machine"
 
-state "server wannabe" as server_wannabe
+state "init"           as init
 state "start server"   as start_server
 state "server"         as server
 state "address in use" as address_in_use
@@ -23,8 +23,8 @@ state "connect client" as connect_client
 state "client"         as client
 state "client failed"  as client_failed
 
-[*]            -->              server_wannabe
-server_wannabe -[thickness=2]-> start_server   : start server → server
+[*]            -->              init
+init           -[thickness=2]-> start_server   : start server → server
 start_server   -[thickness=2]-> address_in_use : cleanup
 start_server   -[thickness=2]-> server_failed  : cleanup
 start_server   -[thickness=2]-> server         : hook up server event listeners
@@ -34,6 +34,6 @@ server_failed  -[thickness=2]-> client_wannabe : cleanup
 client_wannabe -->              connect_client : start connecting
 connect_client -->              client         : connected
 connect_client -->              client_failed  : could not
-client         -->              client_failed  : fatal error
-client_failed  -[thickness=2]-> server_wannabe : cleanup → server wannabe
+client         -[thickness=2]-> client_failed  : cleanup
+client_failed  -[thickness=2]-> init           : cleanup
 @enduml

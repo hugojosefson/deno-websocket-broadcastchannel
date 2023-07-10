@@ -9,7 +9,7 @@ import { WebSocketServer } from "./web-socket-server.ts";
 const log0: Logger = logger(import.meta.url);
 
 type ClientServerState =
-  | "server wannabe"
+  | "init"
   | "start server"
   | "server"
   | "address in use"
@@ -56,14 +56,19 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     return this.state.transitionTo("connect client");
   }
 
-  private cleanupAndGotoServerWannabe() {
+  private cleanupAndGotoStartServer() {
     this.cleanup();
-    return this.state.transitionTo("server wannabe");
+    return this.startServerAndGotoServer();
+  }
+
+  private cleanupAndGotoInit() {
+    this.cleanup();
+    return this.state.transitionTo("init");
   }
 
   createClientServerStateMachine(): StateMachine<ClientServerState> {
     return new StateMachine<ClientServerState>(
-      "server wannabe",
+      "init",
       (transition, createTransition) =>
         this.abortController.signal.aborted
           ? createTransition("closed")
@@ -71,7 +76,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
       undefined,
       [
         {
-          from: "server wannabe",
+          from: "init",
           to: "start server",
           fn: this.startServerAndGotoServer.bind(this),
         },
@@ -123,12 +128,12 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         {
           from: "client",
           to: "client failed",
-          description: "fatal error",
+          fn: this.cleanupAndGotoInit.bind(this),
         },
         {
           from: "client failed",
-          to: "server wannabe",
-          fn: this.cleanupAndGotoServerWannabe.bind(this),
+          to: "init",
+          fn: this.cleanupAndGotoStartServer.bind(this),
         },
         {
           from: "client failed",
@@ -166,7 +171,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           description: "aborted",
         },
         {
-          from: "server wannabe",
+          from: "init",
           to: "closed",
           description: "aborted",
         },
@@ -178,11 +183,14 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
       ],
     );
   }
-  constructor(url: IdUrl) {
+  constructor(url: IdUrl, autoStart = true) {
     super();
     this.log1 = log0.sub(WebSocketClientServer.name).sub(url.toString());
     this.url = url;
     this.state = this.createClientServerStateMachine();
+    if (autoStart) {
+      this.state.transitionToNextNonFinalState();
+    }
   }
 
   [Symbol.dispose](): void {
