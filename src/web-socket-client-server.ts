@@ -4,7 +4,10 @@ import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
 import { LocalMultiplexMessage } from "./multiplex-message.ts";
 import { Disposable, Symbol } from "./using.ts";
 import { StateMachine } from "./state-machine.ts";
-import { WebSocketServer } from "./web-socket-server.ts";
+import {
+  WebSocketClientMessageEvent,
+  WebSocketServer,
+} from "./web-socket-server.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -40,11 +43,61 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   private cleanupAndStartServerAndGotoServer() {
     this.cleanup();
     this.server = new WebSocketServer(this.url, this.abortController.signal);
+
+    this.server.addEventListener("client:open", () => {
+      this.sendOutgoingMessages();
+    });
+    this.server.addEventListener("client:message", (event: Event) => {
+      if (!(event instanceof WebSocketClientMessageEvent)) {
+        throw new Error("Expected WebSocketClientMessageEvent");
+      }
+      const message: LocalMultiplexMessage = JSON.parse(
+        event.data.clientEvent.data,
+      );
+      this.dispatchEvent(new MessageEvent("message", { data: message }));
+    });
+    this.server.finished.then(() => {
+      this.state.transitionTo("server failed");
+    });
+
     return this.state.transitionTo("server");
   }
 
-  private hookUpServerEventListeners() {
-    // TODO: hook up event listeners, handle messages, closing, etc.
+  private cleanupAndStartConnecting() {
+    this.cleanup();
+    this.ws = new WebSocket(this.url);
+    this.ws.addEventListener("open", () => {
+      this.state.transitionTo("client");
+    });
+    this.ws.addEventListener("error", () => {
+      this.state.transitionTo("client failed");
+    });
+    this.ws.addEventListener("close", () => {
+      this.state.transitionTo("client failed");
+    });
+  }
+
+  private sendOutgoingMessages() {
+    while (this.shouldSendOutgoingMessage()) {
+      this.doSendOutgoingMessage();
+    }
+  }
+
+  private shouldSendOutgoingMessage() {
+    const notAborted = !this.abortController.signal.aborted;
+    const inRelevantState = this.state.is("client") || this.state.is("server");
+    const haveMessages = this.outgoingMessages.length > 0;
+    return notAborted && haveMessages && inRelevantState;
+  }
+
+  private doSendOutgoingMessage() {
+    const message: LocalMultiplexMessage | undefined = this.outgoingMessages
+      .shift();
+    if (message) {
+      const data: string = JSON.stringify(message);
+      this.ws?.send(data);
+      this.server?.broadcast(data);
+    }
   }
 
   createClientServerStateMachine(): StateMachine<ClientServerState> {
@@ -89,22 +142,22 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         {
           from: "start server",
           to: "server",
-          fn: this.hookUpServerEventListeners.bind(this),
+          fn: this.sendOutgoingMessages.bind(this),
         },
         {
           from: "client wannabe",
           to: "connect client",
-          description: "start connecting",
+          fn: this.cleanupAndStartConnecting.bind(this),
         },
         {
           from: "connect client",
           to: "client",
-          description: "connected",
+          fn: this.sendOutgoingMessages.bind(this),
         },
         {
           from: "connect client",
           to: "client failed",
-          description: "could not",
+          fn: StateMachine.gotoFn(() => this.state, "server wannabe"),
         },
         {
           from: "client",
@@ -114,6 +167,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         {
           from: "client failed",
           to: "server wannabe",
+          fn: StateMachine.gotoFn(() => this.state, "start server"),
         },
         {
           from: "client failed",
@@ -163,11 +217,15 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
       ],
     );
   }
+
   constructor(url: IdUrl, autoStart = true) {
     super();
     this.log1 = log0.sub(WebSocketClientServer.name).sub(url.toString());
     this.url = url;
     this.state = this.createClientServerStateMachine();
+    this.abortController.signal.addEventListener("abort", () => {
+      this.state.transitionTo("closed");
+    });
     if (autoStart) {
       this.state.transitionToNextNonFinalState();
     }

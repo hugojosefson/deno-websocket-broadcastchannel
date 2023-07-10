@@ -27,13 +27,13 @@ state "client failed"  as client_failed
 server_wannabe -[thickness=5]-> start_server   : cleanup, start server,  → server
 start_server   -[thickness=2]-> address_in_use
 start_server   -[thickness=2]-> server_failed
-start_server   -[thickness=5]-> server         : hook up server event listeners
+start_server   -[thickness=5]-> server         : send outgoing messages
 server         -[thickness=2]-> server_failed
 address_in_use -[thickness=2]-> client_wannabe
 server_failed  -[thickness=2]-> client_wannabe
-client_wannabe -->              connect_client : start connecting
-connect_client -->              client         : connected
-connect_client -->              client_failed  : could not
+client_wannabe -[thickness=5]-> connect_client : cleanup, start connecting
+connect_client -[thickness=5]-> client         : send outgoing messages
+connect_client -[thickness=2]-> client_failed
 client         -[thickness=2]-> client_failed
-client_failed  -->              server_wannabe
+client_failed  -[thickness=2]-> server_wannabe
 @enduml

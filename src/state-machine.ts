@@ -433,4 +433,8 @@ export class StateMachine<
     Object.defineProperty(fn, GOTO_SYMBOL, { value: true });
     return fn;
   }
+
+  is(state: S) {
+    return this._state === state;
+  }
 }

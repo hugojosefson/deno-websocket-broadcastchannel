@@ -5,14 +5,14 @@ import { IdUrl } from "./id-url.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-export interface WebSocketEventData<E extends Event> {
+export interface WebSocketEventData<E extends Event | undefined> {
   ws: WebSocket;
   url: string;
-  clientEvent?: E;
+  clientEvent: E;
 }
 
 export interface WebSocketEvent extends Event {
-  data: WebSocketEventData<Event>;
+  data: WebSocketEventData<Event | undefined>;
 }
 
 export class WebSocketClientEvent<
@@ -21,13 +21,19 @@ export class WebSocketClientEvent<
     | "client:close"
     | "client:message"
     | "client:error",
-  E extends Event | MessageEvent = Event,
+  E extends (
+    T extends "client:message" ? MessageEvent
+      : (
+        T extends "client:open" ? (undefined | Event)
+          : Event
+      )
+  ),
 > extends MessageEvent<WebSocketEventData<E>> implements WebSocketEvent {
   constructor(
     type: T,
     ws: WebSocket,
     url: string,
-    clientEvent?: E,
+    clientEvent: E,
   ) {
     super(
       type as string,
@@ -55,6 +61,9 @@ export class WebSocketServer extends EventTarget implements Deno.Closer {
   readonly webSockets: Set<WebSocket> = new Set<WebSocket>();
   readonly server: Deno.Server;
   readonly abortController: AbortController;
+  get finished(): Promise<void> {
+    return this.server.finished;
+  }
 
   constructor(private url: IdUrl, signal?: AbortSignal) {
     super();
@@ -93,6 +102,25 @@ export class WebSocketServer extends EventTarget implements Deno.Closer {
     log2("done");
   }
 
+  broadcast(message: string) {
+    const log2: Logger = this.log1.sub(this.broadcast.name);
+    log2(`sending message to ${this.webSockets.size} clients...`);
+    let count = 0;
+    for (const ws of this.webSockets) {
+      log2(`sending message to client...`);
+      try {
+        ws.send(message);
+        count++;
+        log2(`sent message to client`);
+      } catch (error) {
+        log2(`failed to send message to client`, error);
+        safely(() => ws.close());
+        this.webSockets.delete(ws);
+      }
+    }
+    log2(`sent message to ${count} clients`);
+  }
+
   private handleIncomingWs(
     ws: WebSocket,
     req: Request,
@@ -105,7 +133,7 @@ export class WebSocketServer extends EventTarget implements Deno.Closer {
     log2(`ws.open; added client to set of ${this.webSockets.size} clients`);
     log2("ws.open; dispatching client:open event...");
     this.dispatchEvent(
-      new WebSocketClientEvent("client:open", ws, req.url),
+      new WebSocketClientEvent("client:open", ws, req.url, undefined),
     );
     log2("ws.open; dispatched client:open event");
 
