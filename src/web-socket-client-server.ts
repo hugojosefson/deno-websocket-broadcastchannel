@@ -3,7 +3,7 @@ import { IdUrl } from "./id-url.ts";
 import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
 import { LocalMultiplexMessage } from "./multiplex-message.ts";
 import { Disposable, Symbol } from "./using.ts";
-import { StateMachine } from "./state-machine.ts";
+import { OnTransition, StateMachine } from "./state-machine.ts";
 import { WebSocketServer } from "./web-socket-server.ts";
 
 const log0: Logger = logger(import.meta.url);
@@ -37,33 +37,21 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     this.ws = undefined;
   }
 
-  private startServerAndGotoServer() {
+  private goto(to: ClientServerState): OnTransition<ClientServerState> {
+    const fn = () => this.state.transitionTo(to);
+    const name = `goto ${to}`;
+    Object.defineProperty(fn, "name", { value: name });
+    return fn;
+  }
+
+  private cleanupAndStartServerAndGotoServer() {
+    this.cleanup();
     this.server = new WebSocketServer(this.url, this.abortController.signal);
     return this.state.transitionTo("server");
   }
 
   private hookUpServerEventListeners() {
     // TODO: hook up event listeners, handle messages, closing, etc.
-  }
-
-  private cleanupAndGotoClientWannabe() {
-    this.cleanup();
-    return this.state.transitionTo("client wannabe");
-  }
-
-  private cleanupAndGotoConnectClient() {
-    this.cleanup();
-    return this.state.transitionTo("connect client");
-  }
-
-  private cleanupAndGotoStartServer() {
-    this.cleanup();
-    return this.startServerAndGotoServer();
-  }
-
-  private cleanupAndGotoInit() {
-    this.cleanup();
-    return this.state.transitionTo("init");
   }
 
   createClientServerStateMachine(): StateMachine<ClientServerState> {
@@ -78,32 +66,32 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         {
           from: "init",
           to: "start server",
-          fn: this.startServerAndGotoServer.bind(this),
+          fn: this.cleanupAndStartServerAndGotoServer.bind(this),
         },
         {
           from: "start server",
           to: "address in use",
-          fn: this.cleanupAndGotoClientWannabe.bind(this),
+          fn: this.goto("client wannabe"),
         },
         {
           from: "start server",
           to: "server failed",
-          fn: this.cleanupAndGotoClientWannabe.bind(this),
+          fn: this.goto("client wannabe"),
         },
         {
           from: "server",
           to: "server failed",
-          fn: this.cleanupAndGotoClientWannabe.bind(this),
+          fn: this.goto("client wannabe"),
         },
         {
           from: "address in use",
           to: "client wannabe",
-          fn: this.cleanupAndGotoConnectClient.bind(this),
+          fn: this.goto("connect client"),
         },
         {
           from: "server failed",
           to: "client wannabe",
-          fn: this.cleanupAndGotoConnectClient.bind(this),
+          fn: this.goto("connect client"),
         },
         {
           from: "start server",
@@ -128,12 +116,11 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         {
           from: "client",
           to: "client failed",
-          fn: this.cleanupAndGotoInit.bind(this),
+          fn: this.goto("init"),
         },
         {
           from: "client failed",
           to: "init",
-          fn: this.cleanupAndGotoStartServer.bind(this),
         },
         {
           from: "client failed",

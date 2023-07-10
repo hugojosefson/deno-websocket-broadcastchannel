@@ -220,7 +220,8 @@ export class StateMachine<
 
     function cleanupDescription(description = "", to: S): string {
       description = description.trim();
-      description = description.replace(/ and goto /g, " → ");
+      description = description.replace(/,? and /g, ", ");
+      description = description.replace(/\bgoto /g, " → ");
 
       const availableTransitionsAfter = that.getAvailableTransitions(to);
       const availableTransitionsAfterExceptFinalStates: S[] =
