@@ -5,6 +5,8 @@ const INITIAL_STATE = `[*]`;
 const DEFAULT_ARROW = `-->`;
 const FINAL_STATE = `[*]`;
 
+const GOTO_SYMBOL: unique symbol = Symbol("goto");
+
 export interface TransitionDefinition<S> {
   from: S;
   to: S;
@@ -13,7 +15,9 @@ export interface TransitionDefinition<S> {
 }
 
 export type ErrorResponse = void | never | Promise<void | never>;
-export type OnTransition<S> = Fn<S, void | Promise<void>>;
+export type OnTransition<S> = Fn<S, void | Promise<void>> & {
+  [GOTO_SYMBOL]?: true;
+};
 export type Fn<S, R> = (transition: TransitionDefinition<S>) => R;
 export type OnDisallowedTransition<S, E extends ErrorResponse> = (
   from: S,
@@ -196,7 +200,11 @@ export class StateMachine<
         modifiers.push("dotted");
       }
       if (fn !== undefined && fn !== noop) {
-        modifiers.push("thickness=2");
+        if (fn[GOTO_SYMBOL]) {
+          modifiers.push("thickness=2");
+        } else {
+          modifiers.push("thickness=5");
+        }
       }
       if (modifiers.length === 0) {
         return DEFAULT_ARROW;
@@ -226,13 +234,6 @@ export class StateMachine<
       const availableTransitionsAfter = that.getAvailableTransitions(to);
       const availableTransitionsAfterExceptFinalStates: S[] =
         availableTransitionsAfter.filter((s) => !that.isFinal(s));
-
-      console.dir({
-        description,
-        to,
-        availableTransitionsAfter,
-        availableTransitionsAfterExceptFinalStates,
-      });
 
       if (availableTransitionsAfterExceptFinalStates.length === 1) {
         const after: S = availableTransitionsAfterExceptFinalStates[0];
@@ -418,5 +419,18 @@ export class StateMachine<
     }
     const transition: S = nonFinalTransitions[0];
     this.transitionTo(transition);
+  }
+
+  static gotoFn<S>(
+    instanceGetter: () => StateMachine<S>,
+    to: S,
+  ): OnTransition<S> {
+    const fn: OnTransition<S> = () => {
+      instanceGetter().transitionTo(to);
+    };
+    const name = `goto ${to}`;
+    Object.defineProperty(fn, "name", { value: name });
+    Object.defineProperty(fn, GOTO_SYMBOL, { value: true });
+    return fn;
   }
 }

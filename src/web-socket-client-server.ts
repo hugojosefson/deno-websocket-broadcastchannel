@@ -3,13 +3,13 @@ import { IdUrl } from "./id-url.ts";
 import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
 import { LocalMultiplexMessage } from "./multiplex-message.ts";
 import { Disposable, Symbol } from "./using.ts";
-import { OnTransition, StateMachine } from "./state-machine.ts";
+import { StateMachine } from "./state-machine.ts";
 import { WebSocketServer } from "./web-socket-server.ts";
 
 const log0: Logger = logger(import.meta.url);
 
 type ClientServerState =
-  | "init"
+  | "server wannabe"
   | "start server"
   | "server"
   | "address in use"
@@ -37,13 +37,6 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     this.ws = undefined;
   }
 
-  private goto(to: ClientServerState): OnTransition<ClientServerState> {
-    const fn = () => this.state.transitionTo(to);
-    const name = `goto ${to}`;
-    Object.defineProperty(fn, "name", { value: name });
-    return fn;
-  }
-
   private cleanupAndStartServerAndGotoServer() {
     this.cleanup();
     this.server = new WebSocketServer(this.url, this.abortController.signal);
@@ -56,7 +49,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
 
   createClientServerStateMachine(): StateMachine<ClientServerState> {
     return new StateMachine<ClientServerState>(
-      "init",
+      "server wannabe",
       (transition, createTransition) =>
         this.abortController.signal.aborted
           ? createTransition("closed")
@@ -64,34 +57,34 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
       undefined,
       [
         {
-          from: "init",
+          from: "server wannabe",
           to: "start server",
           fn: this.cleanupAndStartServerAndGotoServer.bind(this),
         },
         {
           from: "start server",
           to: "address in use",
-          fn: this.goto("client wannabe"),
+          fn: StateMachine.gotoFn(() => this.state, "client wannabe"),
         },
         {
           from: "start server",
           to: "server failed",
-          fn: this.goto("client wannabe"),
+          fn: StateMachine.gotoFn(() => this.state, "client wannabe"),
         },
         {
           from: "server",
           to: "server failed",
-          fn: this.goto("client wannabe"),
+          fn: StateMachine.gotoFn(() => this.state, "client wannabe"),
         },
         {
           from: "address in use",
           to: "client wannabe",
-          fn: this.goto("connect client"),
+          fn: StateMachine.gotoFn(() => this.state, "connect client"),
         },
         {
           from: "server failed",
           to: "client wannabe",
-          fn: this.goto("connect client"),
+          fn: StateMachine.gotoFn(() => this.state, "connect client"),
         },
         {
           from: "start server",
@@ -116,11 +109,11 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         {
           from: "client",
           to: "client failed",
-          fn: this.goto("init"),
+          fn: StateMachine.gotoFn(() => this.state, "server wannabe"),
         },
         {
           from: "client failed",
-          to: "init",
+          to: "server wannabe",
         },
         {
           from: "client failed",
@@ -158,7 +151,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           description: "aborted",
         },
         {
-          from: "init",
+          from: "server wannabe",
           to: "closed",
           description: "aborted",
         },
