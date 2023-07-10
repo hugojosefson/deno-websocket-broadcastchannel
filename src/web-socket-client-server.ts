@@ -4,15 +4,14 @@ import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
 import { LocalMultiplexMessage } from "./multiplex-message.ts";
 import { Disposable, Symbol } from "./using.ts";
 import { StateMachine } from "./state-machine.ts";
-import { getPortNumber, safely } from "./fn.ts";
-import Conn = Deno.Conn;
+import { WebSocketServer } from "./web-socket-server.ts";
 
 const log0: Logger = logger(import.meta.url);
 
 type ClientServerState =
   | "server wannabe"
-  | "start listening"
-  | "accept next connection"
+  | "start server"
+  | "server"
   | "address in use"
   | "server failed"
   | "client wannabe"
@@ -25,150 +24,86 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   private readonly log1: Logger;
   readonly channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
   private readonly state: StateMachine<ClientServerState>;
-  private shouldClose = false;
-  private listener?: Deno.Listener;
-  private readonly clients: Set<WebSocket> = new Set<WebSocket>();
+  readonly abortController: AbortController = new AbortController();
+  private server?: WebSocketServer;
   private ws?: WebSocket;
   private outgoingMessages: LocalMultiplexMessage[] = [];
   readonly url: IdUrl;
 
-  private startListening() {
-    const port: number = getPortNumber(this.url);
-    try {
-      this.listener = Deno.listen({
-        port,
-        transport: "tcp",
-        hostname: this.url.hostname,
-      });
-    } catch (e) {
-      return this.state.transitionTo(
-        e instanceof Deno.errors.AddrInUse ? "address in use" : "server failed",
-      );
-    }
+  private cleanup() {
+    this.server?.close();
+    this.server = undefined;
+    this.ws?.close();
+    this.ws = undefined;
   }
 
-  private addressInUse() {
-    this.listener?.close();
-    this.listener = undefined;
+  private startServerAndGotoServer() {
+    this.server = new WebSocketServer(this.url, this.abortController.signal);
+    return this.state.transitionTo("server");
+  }
+
+  private hookUpServerEventListeners() {
+    // TODO: hook up event listeners, handle messages, closing, etc.
+  }
+
+  private cleanupAndGotoClientWannabe() {
+    this.cleanup();
     return this.state.transitionTo("client wannabe");
   }
 
-  private readonly handleConnPromises: Set<Promise<void>> = new Set();
-  private async acceptNextConnection() {
-    const conn: Conn | undefined = await this.listener?.accept();
-    if (conn === undefined) {
-      return this.state.transitionTo("server failed");
-    }
-    const connPromise = this.handleConn(conn);
-    this.handleConnPromises.add(connPromise.finally(() => {
-      this.handleConnPromises.delete(connPromise);
-    }));
-    return this.state.transitionTo("accept next connection");
-  }
-
-  private async handleConn(conn: Conn) {
-    const httpConn: Deno.HttpConn = Deno.serveHttp(conn);
-
-    for await (const requestEvent of httpConn) {
-      const req = requestEvent.request;
-
-      const upgradeHeader = req.headers.get("upgrade") || "";
-      if (upgradeHeader.toLowerCase() !== "websocket") {
-        await requestEvent.respondWith(
-          new Response(null, {
-            status: 400,
-          }),
-        );
-        return this.state.transitionTo("accept next connection");
-      }
-
-      const upgrade: Deno.WebSocketUpgrade = Deno.upgradeWebSocket(req);
-
-      const ws: WebSocket = upgrade.socket;
-      ws.addEventListener("open", () => {
-        this.clients.add(ws);
-      });
-      ws.addEventListener("close", () => {
-        this.clients.delete(ws);
-      });
-
-      await requestEvent.respondWith(upgrade.response);
-    }
-  }
-
-  private async handleRequestEvent(requestEvent: Deno.RequestEvent) {
-  }
-
-  private async cleanup() {
-    this.listener?.close();
-    this.listener = undefined;
-    this.ws?.close();
-    this.ws = undefined;
-    this.clients.forEach((ws) => safely(() => ws.close()));
-    this.clients.clear();
-    for (const p of this.handleConnPromises) {
-      await p.catch(() => undefined);
-    }
-  }
-
-  private async clientWannabe() {
-    await this.cleanup();
+  private cleanupAndGotoConnectClient() {
+    this.cleanup();
     return this.state.transitionTo("connect client");
   }
 
-  private async serverFailed() {
-    await this.cleanup();
-    return this.state.transitionTo("server failed");
+  private cleanupAndGotoServerWannabe() {
+    this.cleanup();
+    return this.state.transitionTo("server wannabe");
   }
 
   createClientServerStateMachine(): StateMachine<ClientServerState> {
     return new StateMachine<ClientServerState>(
       "server wannabe",
       (transition, createTransition) =>
-        this.shouldClose ? createTransition("closed") : transition,
+        this.abortController.signal.aborted
+          ? createTransition("closed")
+          : transition,
       undefined,
       [
         {
           from: "server wannabe",
-          to: "start listening",
-          fn: this.startListening.bind(this),
+          to: "start server",
+          fn: this.startServerAndGotoServer.bind(this),
         },
         {
-          from: "start listening",
+          from: "start server",
           to: "address in use",
-          fn: this.addressInUse.bind(this),
+          fn: this.cleanupAndGotoClientWannabe.bind(this),
         },
         {
-          from: "start listening",
-          to: "accept next connection",
-          fn: this.acceptNextConnection.bind(this),
-        },
-        {
-          from: "accept next connection",
-          to: "accept next connection",
-          fn: this.acceptNextConnection.bind(this),
-        },
-        {
-          from: "start listening",
+          from: "start server",
           to: "server failed",
-          description: "other error",
-          fn: this.serverFailed.bind(this),
+          fn: this.cleanupAndGotoClientWannabe.bind(this),
+        },
+        {
+          from: "server",
+          to: "server failed",
+          fn: this.cleanupAndGotoClientWannabe.bind(this),
         },
         {
           from: "address in use",
           to: "client wannabe",
-          fn: this.clientWannabe.bind(this),
-        },
-        {
-          from: "accept next connection",
-          to: "server failed",
-          description: "fatal error",
-          fn: this.serverFailed.bind(this),
+          fn: this.cleanupAndGotoConnectClient.bind(this),
         },
         {
           from: "server failed",
           to: "client wannabe",
-          fn: this.clientWannabe.bind(this),
+          fn: this.cleanupAndGotoConnectClient.bind(this),
+        },
+        {
+          from: "start server",
+          to: "server",
+          fn: this.hookUpServerEventListeners.bind(this),
         },
         {
           from: "client wannabe",
@@ -193,51 +128,47 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         {
           from: "client failed",
           to: "server wannabe",
+          fn: this.cleanupAndGotoServerWannabe.bind(this),
         },
         {
           from: "client failed",
           to: "closed",
-          description: "should close",
+          description: "aborted",
         },
         {
           from: "connect client",
           to: "closed",
-          description: "should close",
+          description: "aborted",
         },
         {
           from: "client wannabe",
           to: "closed",
-          description: "should close",
+          description: "aborted",
         },
         {
           from: "client",
           to: "closed",
-          description: "should close",
+          description: "aborted",
         },
         {
           from: "address in use",
           to: "closed",
-          description: "should close",
+          description: "aborted",
         },
         {
           from: "server failed",
           to: "closed",
-          description: "should close",
+          description: "aborted",
         },
         {
-          from: "start listening",
+          from: "start server",
           to: "closed",
-          description: "should close",
+          description: "aborted",
         },
         {
           from: "server wannabe",
           to: "closed",
-          description: "should close",
-        },
-        {
-          from: "accept next connection",
-          to: "closed",
-          description: "should close",
+          description: "aborted",
         },
         {
           from: "closed",
@@ -256,9 +187,5 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
 
   [Symbol.dispose](): void {
     this.state.transitionTo("closed");
-  }
-
-  async runUntilClosed(): Promise<void> {
-    const log2: Logger = this.log1.sub(this.runUntilClosed.name);
   }
 }

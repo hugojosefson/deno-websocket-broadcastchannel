@@ -1,33 +1,38 @@
-import { s, safely } from "./fn.ts";
+import { getPortNumber, orSignalController, s, safely } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
+import { serveWebSocket } from "./serve-web-socket.ts";
+import { IdUrl } from "./id-url.ts";
 
 const log0: Logger = logger(import.meta.url);
 
-interface WebSocketEventData<E extends Event> {
+export interface WebSocketEventData<E extends Event> {
   ws: WebSocket;
   url: string;
-  clientEvent: E;
+  clientEvent?: E;
 }
 
-interface WebSocketEvent extends Event {
+export interface WebSocketEvent extends Event {
   data: WebSocketEventData<Event>;
 }
 
-class WebSocketClientEvent<
+export class WebSocketClientEvent<
   T extends
     | "client:open"
     | "client:close"
     | "client:message"
     | "client:error",
-  E extends WebSocketEvent = WebSocketEvent,
-> extends MessageEvent implements WebSocketEvent {
+  E extends Event | MessageEvent = Event,
+> extends MessageEvent<WebSocketEventData<E>> implements WebSocketEvent {
   constructor(
     type: T,
     ws: WebSocket,
     url: string,
-    clientEvent: Event,
+    clientEvent?: E,
   ) {
-    super(type, { data: { ws, url, clientEvent } });
+    super(
+      type as string,
+      { data: { ws, url, clientEvent } } as MessageEventInit,
+    );
   }
 }
 
@@ -47,115 +52,72 @@ export class WebSocketClientMessageEvent extends WebSocketClientEvent<
 
 export class WebSocketServer extends EventTarget implements Deno.Closer {
   private readonly log1: Logger = log0.sub(WebSocketServer.name);
-  readonly clients: Set<WebSocket> = new Set<WebSocket>();
-  readonly server: Deno.Listener;
-  private listening = false;
-  isListening(): boolean {
-    return this.listening;
-  }
+  readonly webSockets: Set<WebSocket> = new Set<WebSocket>();
+  readonly server: Deno.Server;
+  readonly abortController: AbortController;
 
-  constructor(private port: number) {
+  constructor(private url: IdUrl, signal?: AbortSignal) {
     super();
     const log2: Logger = this.log1.sub("constructor");
-    this.addEventListener("open", () => {
-      log2("this.open; listening = true");
-      this.listening = true;
-    });
-    this.addEventListener("close", () => {
-      log2("this.close; listening = false");
-      this.listening = false;
-    });
-    log2(`creating server for port ${s(port)}...`);
-    this.server = Deno.listen({ port });
-    log2(`created server for port ${s(port)}...`);
 
-    log2("accepting connections...");
-    void this.acceptConnections();
+    log2(`creating server for ${s(url)}...`);
+    this.abortController = orSignalController(signal);
+    this.abortController.signal.addEventListener("abort", () => {
+      log2("closing webSockets...");
+      safely(() => {
+        log2(`closing ${this.webSockets.size} webSockets...`);
+        for (const ws of this.webSockets) {
+          safely(() => {
+            log2(`closing webSocket...`);
+            ws.close();
+            log2(`closed webSocket`);
+          });
+        }
+        log2(`closed clients`);
+      });
+
+      log2(`clearing ${this.webSockets.size} clients...`);
+      this.webSockets.clear();
+      log2(`cleared clients, ${this.webSockets.size} clients remain`);
+    });
+
+    this.server = serveWebSocket(
+      {
+        port: getPortNumber(url),
+        hostname: url.hostname,
+        signal: this.abortController.signal,
+      },
+      this.handleIncomingWs.bind(this),
+    );
+    log2(`created server for ${s(url)}.`);
     log2("done");
   }
 
-  private async acceptConnections(): Promise<void> {
-    const log2: Logger = this.log1.sub(this.acceptConnections.name);
-    log2("dispatching open event...");
-    this.dispatchEvent(new MessageEvent("open"));
-    log2("dispatched open event");
-    log2("for awaiting conns...");
-    try {
-      for await (const conn of this.server) {
-        log2("for awaiting conns; got conn");
-        void this.handleConn(conn);
-        log2("for awaiting conns; continue");
-      }
-    } catch (error) {
-      log2("for awaiting conns; caught and re-dispatching error", error);
-      this.dispatchEvent(new ErrorEvent("error", { error }));
-      safely(() => {
-        log2("for awaiting conns; closing server");
-        this.server.close();
-        log2("for awaiting conns; closed server");
-      });
-    }
-    log2("for awaiting conns; done");
-
-    log2("dispatching close event...");
-    this.dispatchEvent(new CloseEvent("close"));
-    log2("dispatched close event");
-  }
-
-  private async handleConn(conn: Deno.Conn): Promise<void> {
-    const log2: Logger = this.log1.sub(this.handleConn.name);
-    log2("handling conn...");
-    const httpConn: Deno.HttpConn = Deno.serveHttp(conn);
-    log2("got httpConn");
-
-    log2("for awaiting requestEvents...");
-    for await (const requestEvent of httpConn) {
-      log2("for awaiting requestEvents; got requestEvent");
-      const response = this.handleReq(requestEvent.request);
-      log2("for awaiting requestEvents; got response. responding...");
-      await requestEvent.respondWith(response);
-      log2("for awaiting requestEvents; responded. continue...");
-    }
-  }
-
-  private handleReq(req: Request): Response {
-    const log2: Logger = this.log1.sub(this.handleReq.name);
-    log2("handling req...");
-    const upgrade = req.headers.get("upgrade") || "";
-    log2(`got upgrade header ${s(upgrade)}`);
-    if (upgrade.toLowerCase() !== "websocket") {
-      const body = "request isn't trying to upgrade to websocket.";
-      log2(
-        `upgrade header ${s(upgrade)} isn't websocket; responding with 400 ${
-          s(body)
-        }`,
-      );
-      return new Response(body, { status: 400 });
-    }
-    log2(`upgrade header ${s(upgrade)} is websocket; upgrading...`);
-
-    const webSocketUpgrade: Deno.WebSocketUpgrade = Deno.upgradeWebSocket(req);
-    const ws: WebSocket = webSocketUpgrade.socket;
-    log2(`upgraded; got ws`);
-
-    ws.addEventListener("open", (clientEvent: Event) => {
-      log2(`ws.open; adding client to set of ${this.clients.size} clients...`);
-      this.clients.add(ws);
-      log2(`ws.open; added client to set of ${this.clients.size} clients`);
-      log2("ws.open; dispatching client:open event...");
-      this.dispatchEvent(
-        new WebSocketClientEvent("client:open", ws, req.url, clientEvent),
-      );
-      log2("ws.open; dispatched client:open event");
-    });
+  private handleIncomingWs(
+    ws: WebSocket,
+    req: Request,
+    _info: Deno.ServeHandlerInfo,
+  ): void {
+    const log2: Logger = this.log1.sub(this.handleIncomingWs.name);
+    log2("handling ws...");
+    log2(`ws.open; adding client to set of ${this.webSockets.size} clients...`);
+    this.webSockets.add(ws);
+    log2(`ws.open; added client to set of ${this.webSockets.size} clients`);
+    log2("ws.open; dispatching client:open event...");
+    this.dispatchEvent(
+      new WebSocketClientEvent("client:open", ws, req.url),
+    );
+    log2("ws.open; dispatched client:open event");
 
     ws.addEventListener("close", (clientEvent: Event) => {
       log2(`ws.close; got close event`, clientEvent);
       log2(
-        `ws.close; deleting client from set of ${this.clients.size} clients...`,
+        `ws.close; deleting client from set of ${this.webSockets.size} clients...`,
       );
-      this.clients.delete(ws);
-      log2(`ws.close; deleted client from set of ${this.clients.size} clients`);
+      this.webSockets.delete(ws);
+      log2(
+        `ws.close; deleted client from set of ${this.webSockets.size} clients`,
+      );
       log2("ws.close; dispatching client:close event...");
       this.dispatchEvent(
         new WebSocketClientEvent("client:close", ws, req.url, clientEvent),
@@ -183,32 +145,12 @@ export class WebSocketServer extends EventTarget implements Deno.Closer {
       );
       log2("ws.error; dispatched client:error event");
     });
-
-    log2("returning webSocketUpgrade.response...");
-    return webSocketUpgrade.response;
   }
 
   close(): void {
     const log2: Logger = this.log1.sub(this.close.name);
-    log2("closing server...");
-    this.server.close();
-    log2("closed server");
-
-    log2("closing clients...");
-    safely(() => {
-      log2(`closing ${this.clients.size} clients...`);
-      for (const client of this.clients) {
-        safely(() => {
-          log2(`closing client...`);
-          client.close();
-          log2(`closed client`);
-        });
-      }
-      log2(`closed clients`);
-    });
-
-    log2(`clearing ${this.clients.size} clients...`);
-    this.clients.clear();
-    log2(`cleared clients, ${this.clients.size} clients remain`);
+    log2("aborting server...");
+    this.abortController.abort();
+    log2("aborted server");
   }
 }

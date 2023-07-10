@@ -1,6 +1,10 @@
 import { equals, s } from "./fn.ts";
 import { PromiseQueue } from "./promise-queue.ts";
 
+const INITIAL_STATE = `[*]`;
+const DEFAULT_ARROW = `-->`;
+const FINAL_STATE = `[*]`;
+
 export interface TransitionDefinition<S> {
   from: S;
   to: S;
@@ -122,6 +126,9 @@ export class StateMachine<
    * Returns this state machine's PlantUML diagram.
    */
   toPlantUml(title?: string, includeFinal = true): string {
+    // deno-lint-ignore no-this-alias
+    const that: StateMachine<S, E> = this;
+
     function short(state: S): string {
       return `${state}`.replace(/ /g, "_");
     }
@@ -171,19 +178,28 @@ export class StateMachine<
      * @param fn transition function
      */
     function arrow(
-      { to, fn }:
-        & Pick<TransitionDefinition<S>, "to">
-        & Partial<Pick<TransitionDefinition<S>, "fn">>,
+      { from, to, fn }:
+        | (
+          & Pick<TransitionDefinition<S>, "to">
+          & Partial<Pick<TransitionDefinition<S>, "fn" | "from">>
+        )
+        | (
+          & Pick<TransitionDefinition<S>, "from">
+          & Partial<Pick<TransitionDefinition<S>, "fn" | "to">>
+        ),
     ): string {
       const modifiers: string[] = [];
-      if (finalStates.includes(to)) {
+      if (
+        to !== undefined && finalStates.includes(to) ||
+        from !== undefined && finalStates.includes(from)
+      ) {
         modifiers.push("dotted");
       }
       if (fn !== undefined && fn !== noop) {
         modifiers.push("thickness=2");
       }
       if (modifiers.length === 0) {
-        return "-->";
+        return DEFAULT_ARROW;
       }
       return `-[${modifiers.join()}]->`;
     }
@@ -202,6 +218,22 @@ export class StateMachine<
       return name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
     }
 
+    function cleanupDescription(description = "", to: S): string {
+      description = description.trim();
+      description = description.replace(/ and goto /g, " → ");
+
+      const availableTransitionsAfterExceptFinalStates: S[] = that
+        .getAvailableTransitions(to).filter((s) => !that.isFinal(s));
+      if (availableTransitionsAfterExceptFinalStates.length === 1) {
+        const after: S = availableTransitionsAfterExceptFinalStates[0];
+        description = description.replace(`${after}`, "");
+      }
+      description = description.trim();
+      description = description.replace(/→$/g, "");
+      description = description.trim();
+      return description;
+    }
+
     /**
      * Returns the note to use for the transition. If the transition has a
      * description, it is used. Otherwise, an empty string is returned.
@@ -218,12 +250,15 @@ export class StateMachine<
     ): string {
       const s = (() => {
         if (typeof description === "string" && description.length > 0) {
-          return description.replace(/"/g, "'");
+          return cleanupDescription(description.replace(/"/g, "'"), to);
         }
         if (
           fn !== undefined && fn !== noop && unbound(fn?.name).length > 0
         ) {
-          return unCamelCase(unbound(fn.name));
+          return cleanupDescription(
+            unCamelCase(unbound(fn.name)),
+            to,
+          );
         }
 
         return "";
@@ -234,6 +269,16 @@ export class StateMachine<
       return `: ${s}`;
     }
 
+    const stateMaxWidth = Math.max(
+      ...states.map((s) => this.escapePlantUmlString(`${s}`).length),
+    );
+    const fromMaxWidth = Math.max(
+      INITIAL_STATE.length,
+      ...transitions.map((t) => `${t.from}`.length),
+    );
+    const arrowMaxWidth = Math.max(...transitions.map((t) => arrow(t).length));
+    const toMaxWidth = Math.max(...transitions.map((t) => `${t.to}`.length));
+
     /**
      * Renders the PlantUML state machine diagram.
      */
@@ -241,43 +286,54 @@ export class StateMachine<
       "@startuml",
       ...`
       hide empty description
-      skinparam shadowing true
-      skinparam ArrowFontColor #bbb
-      skinparam ArrowFontStyle italic
-      skinparam ArrowColor blue
-      skinparam ArrowThickness 0.2
-      skinparam StateFontColor blue
+
+      skinparam shadowing            true
+      skinparam ArrowFontColor       #bbb
+      skinparam ArrowFontStyle       italic
+      skinparam ArrowColor           blue
+      skinparam ArrowThickness       0.3
+      skinparam StateFontColor       blue
       skinparam StateBackgroundColor lightblue
-      skinparam StateBorderColor blue
+      skinparam StateBorderColor     blue
       skinparam StateBorderThickness 2
       `.trim().split("\n").map((line) => line.trim()),
 
+      "",
       /** Declare title. */
       ...(typeof title === "string" && title.length > 0
         ? [`title ${this.escapePlantUmlString(title)}`]
         : []),
 
+      "",
       /** Declare the states. */
       ...states
         .map(
           (state: S) =>
-            `state ${this.escapePlantUmlString(`${state}`)} as ${short(state)}`,
+            `state ${
+              this.escapePlantUmlString(`${state}`).padEnd(stateMaxWidth)
+            } as ${short(state)}`,
         ),
 
+      "",
       /** Declare initial state. */
-      `[*] --> ${short(initial)}`,
+      `${INITIAL_STATE.padEnd(fromMaxWidth)} ${
+        DEFAULT_ARROW.padEnd(arrowMaxWidth)
+      } ${short(initial)}`,
 
       /** Declare transitions. */
       ...transitions.map(
         ({ from, to, description, fn }: TransitionDefinition<S>) =>
-          `${short(from)} ${arrow({ to, fn })} ${short(to)}${
-            note({ description, fn, to })
-          }`,
+          `${short(from).padEnd(fromMaxWidth)} ${
+            arrow({ to, fn }).padEnd(arrowMaxWidth)
+          } ${short(to).padEnd(toMaxWidth)} ${note({ description, fn, to })}`,
       ),
 
       /** Declare final states. */
       ...finalStates.map(
-        (state: S) => `${short(state)} -[dotted]-> [*]`,
+        (state: S) =>
+          `${short(state).padEnd(fromMaxWidth)} ${
+            arrow({ from: state }).padEnd(arrowMaxWidth)
+          } ${FINAL_STATE}`,
       ),
 
       "@enduml",

@@ -45,7 +45,7 @@ export class WebSocketBroadcastChannel extends EventTarget
     return this.idUrlChannel.channel;
   }
   get url(): string {
-    return this.idUrlChannel.url;
+    return this.idUrlChannel.url.href;
   }
   private readonly idUrlChannel: IdUrlChannel;
 
@@ -57,14 +57,14 @@ export class WebSocketBroadcastChannel extends EventTarget
   constructor(clientServer: WebSocketClientServer, name: string) {
     super();
     this.log.sub("constructor")(`name: ${s(name)}`);
-    this.idUrlChannel = IdUrlChannel.of(url, name);
+    this.idUrlChannel = IdUrlChannel.of(clientServer.url, name);
     this.addEventListener("message", (e: Event) => this.onmessage?.(e));
     this.addEventListener(
       "messageerror",
       (e: Event) => this.onmessageerror?.(e),
     );
 
-    ensureClientServer(this.url).registerChannel(this);
+    clientServer.registerChannel(this);
   }
   postMessage(message: string): void {
     const log1 = this.log.sub(

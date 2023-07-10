@@ -1,5 +1,4 @@
 import { Logger, logger } from "./log.ts";
-import { GlobalThisWithBroadcastChannel } from "./types.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -118,4 +117,21 @@ export function webSocketReadyState(readyState?: number): string {
     default:
       return `UNKNOWN(${s(readyState)})`;
   }
+}
+
+/**
+ * Create an {@link AbortController} that will also abort when the given
+ * {@link AbortSignal} aborts.
+ * @param signal Any {@link AbortSignal} to forward abort events from.
+ * @returns An {@link AbortController} that will also abort when the given
+ * {@link AbortSignal} aborts.
+ */
+export function orSignalController(signal?: AbortSignal): AbortController {
+  const controller = new AbortController();
+  if (signal) {
+    signal.addEventListener("abort", () => {
+      controller.abort();
+    });
+  }
+  return controller;
 }

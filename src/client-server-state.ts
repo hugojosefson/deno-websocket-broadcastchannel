@@ -1,3 +1,4 @@
+#!/usr/bin/env -S deno run --watch --allow-write=./src/client-server-state.puml
 import { WebSocketClientServer } from "./web-socket-client-server.ts";
 import { defaultWebSocketUrl } from "./default-websocket-url.ts";
 
