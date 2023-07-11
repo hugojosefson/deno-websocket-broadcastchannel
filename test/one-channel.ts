@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env
 import { parse } from "https://deno.land/std@0.193.0/flags/mod.ts";
-import { Manager } from "../mod.ts";
+import { createBroadcastChannel } from "../mod.ts";
 import { deferred } from "https://deno.land/std@0.193.0/async/deferred.ts";
 import { s, sleep, ss } from "../src/fn.ts";
 import { CommandFailureError } from "https://deno.land/x/run_simple@2.1.0/src/run.ts";
@@ -24,7 +24,7 @@ async function main(channelName: string, expectedCount: number) {
   }, TOTAL_TIMEOUT);
   void closed.then(() => clearTimeout(timeout));
 
-  const bc = new Manager().createBroadcastChannel(channelName);
+  const bc = createBroadcastChannel(channelName);
   console.error(`bc.name: ${s(bc.name)}`);
   bc.addEventListener("close", () => {
     console.error("bc closed");

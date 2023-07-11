@@ -1,11 +1,12 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env=DEBUG
 import {
   BroadcastChannelIsh,
+  createBroadcastChannel,
   Logger,
   logger,
-  Manager,
   WebSocketBroadcastChannel,
 } from "../mod.ts";
+
 const log: Logger = logger(import.meta.url);
 
 /**
@@ -13,7 +14,7 @@ const log: Logger = logger(import.meta.url);
  */
 async function main() {
   log("Starting...");
-  const chat: BroadcastChannelIsh = new Manager().createBroadcastChannel(
+  const chat: BroadcastChannelIsh = createBroadcastChannel(
     "chat",
   );
 

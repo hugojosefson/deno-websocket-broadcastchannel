@@ -13,17 +13,15 @@ import { defaultWebSocketUrl } from "../src/default-websocket-url.ts";
 import { assertDifferentInstances, rejectOnTimeout } from "./fn.ts";
 import { deferred } from "https://deno.land/std@0.193.0/async/deferred.ts";
 import { using } from "../src/using.ts";
-import { Manager, WebSocketBroadcastChannel } from "../mod.ts";
+import { createBroadcastChannel, WebSocketBroadcastChannel } from "../mod.ts";
 
 import { run } from "https://deno.land/x/run_simple@2.1.0/mod.ts";
 import { s, ss } from "../src/fn.ts";
 import { CommandFailureError } from "https://deno.land/x/run_simple@2.1.0/src/run.ts";
 
 let url: URL;
-let manager: Manager;
 beforeAll(() => {
   url = defaultWebSocketUrl(getAvailablePort());
-  manager = new Manager();
 });
 
 describe("websocket-broadcastchannel", () => {
@@ -32,8 +30,8 @@ describe("websocket-broadcastchannel", () => {
       it("should create them", async () => {
         await using(
           [
-            () => manager.createBroadcastChannel("chat", url),
-            () => manager.createBroadcastChannel("chat", url),
+            () => createBroadcastChannel("chat", url),
+            () => createBroadcastChannel("chat", url),
           ],
           (channels) => {
             assertEquals(channels.length, 2);
@@ -47,8 +45,8 @@ describe("websocket-broadcastchannel", () => {
       it("should send one message from each, to the other", async () => {
         await using(
           [
-            () => manager.createBroadcastChannel("chat", url),
-            () => manager.createBroadcastChannel("chat", url),
+            () => createBroadcastChannel("chat", url),
+            () => createBroadcastChannel("chat", url),
           ],
           async ([bc0, bc1]) => {
             const receivedPromise0 = new Promise<string>((resolve) => {
@@ -73,9 +71,9 @@ describe("websocket-broadcastchannel", () => {
       it("should create them", async () => {
         await using(
           [
-            () => manager.createBroadcastChannel("chat", url),
-            () => manager.createBroadcastChannel("chat", url),
-            () => manager.createBroadcastChannel("chat", url),
+            () => createBroadcastChannel("chat", url),
+            () => createBroadcastChannel("chat", url),
+            () => createBroadcastChannel("chat", url),
           ],
           (channels) => {
             assertEquals(channels.length, 3);
@@ -89,9 +87,9 @@ describe("websocket-broadcastchannel", () => {
       it("should send one message from each, to the others", async () => {
         await using(
           [
-            () => manager.createBroadcastChannel("chat", url),
-            () => manager.createBroadcastChannel("chat", url),
-            () => manager.createBroadcastChannel("chat", url),
+            () => createBroadcastChannel("chat", url),
+            () => createBroadcastChannel("chat", url),
+            () => createBroadcastChannel("chat", url),
           ],
           async ([bc0, bc1, bc2]) => {
             const doneDeferred = deferred<void>();
@@ -129,11 +127,11 @@ describe("websocket-broadcastchannel", () => {
       it("should send one message from each, to the others of the same name", async () => {
         await using(
           [
-            () => manager.createBroadcastChannel("chat2", url),
-            () => manager.createBroadcastChannel("chat2", url),
-            () => manager.createBroadcastChannel("chat3", url),
-            () => manager.createBroadcastChannel("chat3", url),
-            () => manager.createBroadcastChannel("chat3", url),
+            () => createBroadcastChannel("chat2", url),
+            () => createBroadcastChannel("chat2", url),
+            () => createBroadcastChannel("chat3", url),
+            () => createBroadcastChannel("chat3", url),
+            () => createBroadcastChannel("chat3", url),
           ],
           async ([chat2a, chat2b, chat3a, chat3b, chat3c]) => {
             const chat2DoneDeferred = deferred<void>();

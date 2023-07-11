@@ -1,5 +1,5 @@
 export { WebSocketBroadcastChannel } from "./src/web-socket-broadcast-channel.ts";
-export { Manager } from "./src/manager.ts";
+export { createBroadcastChannel } from "./src/create-broadcast-channel.ts";
 export { logger } from "./src/log.ts";
 export type { Logger } from "./src/log.ts";
 export type {
