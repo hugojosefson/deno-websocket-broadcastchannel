@@ -42,13 +42,15 @@ function countLabel(label: string): number {
  * @returns A {@link Logger}.
  */
 export function logger(labelOrMetaImportUrl: string): Logger {
-  const label = calculateLabel(labelOrMetaImportUrl);
-  return Object.assign(
-    debug(`pid(${Deno.pid})/${label}/${countLabel(label)}`),
-    {
-      sub(subLabel: string): Logger {
-        return logger(`${label}:${subLabel}`);
-      },
-    },
+  const label: string = calculateLabel(labelOrMetaImportUrl);
+
+  const debugLogger: Debug = debug(
+    `pid(${Deno.pid})/${label}/${countLabel(label)}`,
   );
+  const hasSub: Pick<Logger, "sub"> = {
+    sub(subLabel: string): Logger {
+      return logger(`${label}:${subLabel}`);
+    },
+  };
+  return Object.assign(debugLogger, hasSub) as Logger;
 }

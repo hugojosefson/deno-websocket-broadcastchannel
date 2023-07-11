@@ -26,6 +26,8 @@ type ClientServerState =
   | "closed";
 
 /**
+ * Responsible for managing a WebSocket connection, either as a server or as a client.
+ *
  * Owns:
  * - a url for where to listen, or connect to
  * - a state machine (server/client/connecting/closed etc)

@@ -3,32 +3,6 @@ import { Logger, logger } from "./log.ts";
 const log0: Logger = logger(import.meta.url);
 
 /**
- * Checks if we are definitively allowed to access a given environment variable.
- * @param variable The name of the environment variable.
- * @returns Whether we are allowed to access the environment variable.
- */
-export async function isAllowedEnv(variable: string): Promise<boolean> {
-  const query = { name: "env", variable } as const;
-  const response = await Deno.permissions.query(query);
-  return response.state === "granted";
-}
-
-/**
- * Gets an environment variable, but only if getting it is allowed already.
- * @param variable The name of the environment variable.
- * @returns The value of the environment variable, or undefined if it is not
- * allowed, or not set.
- */
-export async function weakEnvGet(
-  variable: string,
-): Promise<string | undefined> {
-  if (await isAllowedEnv(variable)) {
-    return Deno.env.get(variable);
-  }
-  return undefined;
-}
-
-/**
  * Checks if two items are the same, and the same type.
  * @param items.a The first item.
  * @param items.b The second item.
@@ -105,33 +79,14 @@ export function safely<T = void>(
 }
 
 /**
- * Converts a WebSocket readyState number to a string.
- * @param readyState
- */
-export function webSocketReadyState(readyState?: number): string {
-  switch (readyState) {
-    case WebSocket.CONNECTING:
-      return "CONNECTING";
-    case WebSocket.OPEN:
-      return "OPEN";
-    case WebSocket.CLOSING:
-      return "CLOSING";
-    case WebSocket.CLOSED:
-      return "CLOSED";
-    default:
-      return `UNKNOWN(${s(readyState)})`;
-  }
-}
-
-/**
- * Create an {@link AbortController} that will also abort when the given
+ * Create an {@link AbortController} that can also abort when the given
  * {@link AbortSignal} aborts.
  * @param signal Any {@link AbortSignal} to forward abort events from.
  * @returns An {@link AbortController} that will also abort when the given
  * {@link AbortSignal} aborts.
  */
-export function orSignalController(signal?: AbortSignal): AbortController {
-  const controller = new AbortController();
+export function createOrAbortController(signal?: AbortSignal): AbortController {
+  const controller: AbortController = new AbortController();
   if (signal) {
     signal.addEventListener("abort", () => {
       controller.abort();

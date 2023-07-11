@@ -1,49 +1,3 @@
-interface SymbolConstructor {
-  readonly dispose: unique symbol;
-  readonly asyncDispose: unique symbol;
-}
-
-function existsDisposeSymbol(s: unknown): s is SymbolConstructor & {
-  readonly dispose: unique symbol;
-} {
-  return typeof s === "function" &&
-    typeof (s as { dispose?: unknown }).dispose === "symbol";
-}
-
-function existsAsyncDisposeSymbol(s: unknown): s is SymbolConstructor & {
-  readonly asyncDispose: unique symbol;
-} {
-  return typeof s === "function" &&
-    typeof (s as { asyncDispose?: unknown }).asyncDispose === "symbol";
-}
-
-const fallbackDisposeSymbol: symbol = globalThis.Symbol("@@dispose");
-const fallbackAsyncDisposeSymbol: symbol = globalThis.Symbol("@@asyncDispose");
-
-if (!existsDisposeSymbol(globalThis.Symbol)) {
-  Object.assign(globalThis.Symbol, {
-    dispose: fallbackDisposeSymbol,
-  });
-}
-if (!existsAsyncDisposeSymbol(globalThis.Symbol)) {
-  Object.assign(globalThis.Symbol, {
-    asyncDispose: fallbackAsyncDisposeSymbol,
-  });
-}
-
-export const Symbol: SymbolConstructor = globalThis
-  .Symbol as unknown as SymbolConstructor;
-
-export type Disposable = { [Symbol.dispose](): void };
-export type AsyncDisposable = { [Symbol.asyncDispose](): Promise<void> };
-
-export type Resource =
-  | Deno.Closer
-  | Disposable
-  | AsyncDisposable;
-
-export type ResourceFactory<R extends Resource> = () => R | Promise<R>;
-
 /**
  * Similar to TC39 proposal for `using` blocks.
  *
@@ -62,6 +16,58 @@ export async function using<
 ): Promise<T> {
   return await recursiveUsing(resourceFactories, fn, []);
 }
+
+interface SymbolConstructor {
+  readonly dispose: unique symbol;
+  readonly asyncDispose: unique symbol;
+}
+
+function existsDisposeSymbol(s: unknown): s is SymbolConstructor & {
+  readonly dispose: unique symbol;
+} {
+  return typeof s === "function" &&
+    typeof (s as { dispose?: unknown }).dispose === "symbol";
+}
+
+function existsAsyncDisposeSymbol(s: unknown): s is SymbolConstructor & {
+  readonly asyncDispose: unique symbol;
+} {
+  return typeof s === "function" &&
+    typeof (s as { asyncDispose?: unknown }).asyncDispose === "symbol";
+}
+const fallbackDisposeSymbol: symbol = globalThis.Symbol("@@dispose");
+
+const fallbackAsyncDisposeSymbol: symbol = globalThis.Symbol("@@asyncDispose");
+if (!existsDisposeSymbol(globalThis.Symbol)) {
+  Object.assign(globalThis.Symbol, {
+    dispose: fallbackDisposeSymbol,
+  });
+}
+
+if (!existsAsyncDisposeSymbol(globalThis.Symbol)) {
+  Object.assign(globalThis.Symbol, {
+    asyncDispose: fallbackAsyncDisposeSymbol,
+  });
+}
+
+/** Import this to get the `Symbol.dispose` and `Symbol.asyncDispose` symbols. */
+export const Symbol: SymbolConstructor = globalThis
+  .Symbol as unknown as SymbolConstructor;
+
+/** A resource that can be disposed. */
+export type Disposable = { [Symbol.dispose](): void };
+
+/** A resource that can be asynchronously disposed. */
+export type AsyncDisposable = { [Symbol.asyncDispose](): Promise<void> };
+
+/** A resource that can be disposed, asynchronously disposed, or closed. */
+export type Resource =
+  | Deno.Closer
+  | Disposable
+  | AsyncDisposable;
+
+/** A function that creates a resource. */
+export type ResourceFactory<R extends Resource> = () => R | Promise<R>;
 
 async function recursiveUsing<
   T,

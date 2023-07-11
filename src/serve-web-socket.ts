@@ -1,4 +1,4 @@
-import { orSignalController } from "./fn.ts";
+import { createOrAbortController } from "./fn.ts";
 
 /** Will be called when a newly connected WebSocket emits the "open" event. */
 export type ServeWebSocketHandler = (
@@ -32,16 +32,19 @@ export interface WebSocketSpecificOptions {
  * @returns A response that indicates that the client should have upgraded to a WebSocket.
  */
 export function expectOnlyWebSocketUpgrade(): Response {
-  return new Response("Expected upgrade to WebSocket, but client didn't.", {
-    status: 400,
-  });
+  return new Response(
+    "Expected upgrade to WebSocket, but client didn't request that.",
+    {
+      status: 400,
+    },
+  );
 }
 
 /** Default options for {@link serveWebSocket}. */
-export const defaultOptions: Partial<
+export const defaultServeWebSocketOptions: Partial<
   ServeWebSocketOptions | ServeWebSocketTlsOptions
 > = {
-  predicate: anyWebSocketUpgradeRequest,
+  predicate: isWebSocketUpgradeRequest,
   handler: expectOnlyWebSocketUpgrade,
   onListen: ({ hostname, port }) => {
     console.error(`Listening on ${hostname}:${port}.`);
@@ -71,7 +74,7 @@ export type ServeWebSocketTlsOptions =
  * Does not care about the method or URL of the request.
  * @param request The request to check.
  */
-export function anyWebSocketUpgradeRequest(request: Request): boolean {
+export function isWebSocketUpgradeRequest(request: Request): boolean {
   return (
     (
       request.headers.get("Upgrade") ??
@@ -97,14 +100,16 @@ export function serveWebSocket(
   const effectiveOptions:
     & Required<WebSocketSpecificOptions>
     & (ServeWebSocketOptions | ServeWebSocketTlsOptions) = {
-      ...defaultOptions,
+      ...defaultServeWebSocketOptions,
       ...options,
     } as
       & Required<WebSocketSpecificOptions>
       & (ServeWebSocketOptions | ServeWebSocketTlsOptions);
 
   /** Forward any abort signal from the user-supplied options, and give us power to abort also. */
-  const abortController = orSignalController(effectiveOptions.signal);
+  const abortController: AbortController = createOrAbortController(
+    effectiveOptions.signal,
+  );
   effectiveOptions.signal = abortController.signal;
 
   /** Wrap the user-supplied handler with a predicate that determines whether to handle the request as a WebSocket. */

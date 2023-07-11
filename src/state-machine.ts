@@ -1,4 +1,4 @@
-import { equals, s } from "./fn.ts";
+import { s } from "./fn.ts";
 import { PromiseQueue } from "./promise-queue.ts";
 import { Logger, logger } from "./log.ts";
 
@@ -8,6 +8,9 @@ const INITIAL_STATE = `[*]`;
 const DEFAULT_ARROW = `-->`;
 const FINAL_STATE = `[*]`;
 
+/**
+ * Symbol used to mark a transition as a goto transition.
+ */
 const GOTO_SYMBOL: unique symbol = Symbol("goto");
 
 export interface TransitionDefinition<S> {
@@ -26,6 +29,7 @@ export type OnDisallowedTransition<S, E extends ErrorResponse> = (
   from: S,
   to: S,
 ) => E;
+
 export type OnBeforeTransition<S> = (
   transition: TransitionDefinition<S>,
   createTransition: (to: S) => TransitionDefinition<S>,
@@ -41,6 +45,18 @@ export function defaultOnDisallowedTransition<S>(from: S, to: S): never {
   );
 }
 
+function defaultOnBeforeTransition<S>(
+  transition: TransitionDefinition<S>,
+): TransitionDefinition<S> {
+  return transition;
+}
+
+/**
+ * A state machine.
+ *
+ * @template S The type of the states.
+ * @template E The type of the error response from the onDisallowedTransition callback.
+ */
 export class StateMachine<
   S,
   E extends ErrorResponse = never,
@@ -51,9 +67,17 @@ export class StateMachine<
   private readonly transitions: Map<S, Map<S, TransitionMeta<S>>> = new Map();
   private readonly promiseQueue: PromiseQueue = new PromiseQueue();
 
+  /**
+   * Construct a new StateMachine.
+   *
+   * @param initialState The initial state.
+   * @param onBeforeTransition optional callback that is called before each transition.
+   * @param onDisallowedTransition optional callback that is called when a transition is not allowed.
+   * @param allowedTransitions list of allowed transitions.
+   */
   constructor(
     initialState: S,
-    onBeforeTransition: OnBeforeTransition<S> = (transition) => transition,
+    onBeforeTransition: OnBeforeTransition<S> = defaultOnBeforeTransition<S>,
     onDisallowedTransition: OnDisallowedTransition<S, E> =
       defaultOnDisallowedTransition<S>,
     allowedTransitions: TransitionDefinition<S>[] = [],
@@ -114,6 +138,7 @@ export class StateMachine<
     /** run transition function */
     const fn = transition.fn;
     const result: void | Promise<void> = fn(transition);
+
     /** if transition function returns a Promise, enqueue it */
     if (result instanceof Promise) {
       return this.promiseQueue.enqueue(async () => {
@@ -151,6 +176,7 @@ export class StateMachine<
       return `${state}`.replace(/ /g, "_");
     }
 
+    /** get all states, from the transitions */
     let states: S[] = Array.from(
       new Set([
         ...this.transitions.keys(),
@@ -161,6 +187,8 @@ export class StateMachine<
         ]),
       ]),
     );
+
+    /** extract details about each transition, in a convenient format */
     let transitions: TransitionDefinition<S>[] = [];
     for (const [from, fromTo] of this.transitions.entries()) {
       for (const to of fromTo.keys()) {
@@ -174,10 +202,13 @@ export class StateMachine<
       }
     }
 
+    /** assume current state is initial */
     const initial: S = this._state;
+
+    /** extract final states */
     let finalStates: S[] = states.filter((state: S) => this.isFinal(state));
 
-    /** remove final states, transitions to them */
+    /** if requested, remove final states, transitions to them */
     if (!includeFinal) {
       states = states.filter((state: S) => !finalStates.includes(state));
 
@@ -189,9 +220,13 @@ export class StateMachine<
     }
 
     /**
-     * Returns the arrow to use for the transition. Final states are marked with
-     * a dotted arrow.
-     * @param _from from state, unused for now
+     * Returns the arrow to use for the transition.
+     *
+     * - Final states and initial state, are marked with a dotted arrow.
+     * - Transitions with only a goto function, are marked with a semi-thick arrow.
+     * - Transitions with a non-goto transition function, are marked with a thick arrow.
+     * - All other transitions are marked with a thin arrow.
+     * @param from from state
      * @param to to state
      * @param fn transition function
      */
@@ -226,6 +261,10 @@ export class StateMachine<
       return `-[${modifiers.join()}]->`;
     }
 
+    /**
+     * Returns the name of the transition function, without the prefix "bound ".
+     * @param name
+     */
     function unbound(name = ""): string {
       return name.replace(/^bound /g, "");
     }
@@ -240,6 +279,18 @@ export class StateMachine<
       return name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
     }
 
+    /**
+     * Returns the description of the transition, cleaned up:
+     *
+     * - Shorten "and" to ",".
+     * - Shorten "goto" to "→".
+     * - Remove the "to" state, if there is only one available transition after.
+     * - Remove trailing "→".
+     * - Trim.
+     *
+     * @param description original description
+     * @param to to state
+     */
     function cleanupDescription(description = "", to: S): string {
       description = description.trim();
       description = description.replace(/,? and /g, ", ");
@@ -288,12 +339,13 @@ export class StateMachine<
 
         return "";
       })();
-      if (s.length === 0 || equals({ a: s, b: to })) {
+      if (s === "" || s === `${to}`) {
         return "";
       }
       return `: ${s}`;
     }
 
+    /** calculate the maximum width of each column, for prettier output */
     const stateMaxWidth = Math.max(
       ...states.map((s) => this.escapePlantUmlString(`${s}`).length),
     );
@@ -416,7 +468,7 @@ export class StateMachine<
       throw new Error(
         `Expected at least one available transition from ${
           s(this._state)
-        }, found none.`,
+        } to a non-final state, found none.`,
       );
     }
     const nonFinalTransitions: S[] = availableTransitions.filter(
@@ -435,6 +487,13 @@ export class StateMachine<
     this.transitionTo(transition);
   }
 
+  /**
+   * Utility function to create a transition function that only immediately
+   * transitions to the given state.
+   *
+   * @param instanceGetter A function that returns the state machine instance.
+   * @param to The state to transition to.
+   */
   static gotoFn<S>(
     instanceGetter: () => StateMachine<S>,
     to: S,
@@ -456,6 +515,11 @@ export class StateMachine<
     return either.includes(this._state);
   }
 
+  /**
+   * Checks if you may transition to the given state.
+   * @param to The state to transition to.
+   * @param from The state to transition from. Defaults to current state.
+   */
   mayTransitionTo(to: S, from?: S): boolean {
     return this.getAvailableTransitions(from).includes(to);
   }

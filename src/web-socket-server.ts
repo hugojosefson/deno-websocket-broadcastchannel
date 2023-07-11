@@ -1,4 +1,4 @@
-import { getPortNumber, orSignalController, s, safely } from "./fn.ts";
+import { createOrAbortController, getPortNumber, s, safely } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
 import { serveWebSocket } from "./serve-web-socket.ts";
 import { IdUrl } from "./id-url.ts";
@@ -56,6 +56,23 @@ export class WebSocketClientMessageEvent extends WebSocketClientEvent<
   }
 }
 
+/**
+ * This is the server part of WebSocketClientServer.
+ *
+ * Owns:
+ * - one {@link Deno.Server}
+ * - many {@link WebSocket}s, one per client.
+ *
+ * Emits:
+ * - "client:open" when a client connects.
+ * - "client:close" when a client disconnects.
+ * - "client:message" when a client sends a message.
+ *
+ * Listens to:
+ * - "close" on {@link Deno.Server}: close all {@link WebSocket}s.
+ * - "close" on {@link WebSocket}: delete it from {@link webSockets}.
+ * - "message" on {@link WebSocket}: emit "client:message".
+ */
 export class WebSocketServer extends EventTarget implements Deno.Closer {
   private readonly log1: Logger = log0.sub(WebSocketServer.name);
   readonly webSockets: Set<WebSocket> = new Set<WebSocket>();
@@ -70,7 +87,7 @@ export class WebSocketServer extends EventTarget implements Deno.Closer {
     const log2: Logger = this.log1.sub("constructor");
 
     log2(`creating server for ${s(url)}...`);
-    this.abortController = orSignalController(signal);
+    this.abortController = createOrAbortController(signal);
     this.abortController.signal.addEventListener(
       "abort",
       () => {
