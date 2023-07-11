@@ -1,14 +1,15 @@
 import { Logger, logger } from "./log.ts";
 import { IdUrl } from "./id-url.ts";
 import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
-import { LocalMultiplexMessage } from "./multiplex-message.ts";
+import {
+  extractAnyMultiplexMessage,
+  MultiplexMessage,
+} from "./multiplex-message.ts";
 import { Disposable, Symbol } from "./using.ts";
 import { StateMachine } from "./state-machine.ts";
-import {
-  WebSocketClientMessageEvent,
-  WebSocketServer,
-} from "./web-socket-server.ts";
+import { WebSocketServer } from "./web-socket-server.ts";
 import { s, ss } from "./fn.ts";
+import { IdUrlChannel } from "./id-url-channel.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -17,13 +18,38 @@ type ClientServerState =
   | "start server"
   | "server"
   | "address in use"
-  | "server failed"
+  | "server closed"
   | "client wannabe"
   | "connect client"
   | "client"
-  | "client failed"
+  | "client closed"
   | "closed";
 
+/**
+ * Owns:
+ * - a url for where to listen, or connect to
+ * - a state machine (server/client/connecting/closed etc)
+ * - an AbortController for when "closed" state is desired or reached
+ * - a Set<WebSocketBroadcastChannel>, per channel name
+ * - a WebSocketServer (when server)
+ * - a WebSocket       (when client)
+ * - yet undelivered messages
+ *
+ * Emits:
+ * - "close" when aborted or closed
+ *
+ * Listens to:
+ * - {@link AbortController}: "abort" → state:closed.
+ * - {@link WebSocketBroadcastChannel}: "close" → remove from {@link channelSets}, and if empty, abort.
+ * - {@link WebSocketBroadcastChannel}: "postMessage" → means a message came from a {@link WebSocketBroadcastChannel}, so it should be sent to the server or clients, depending on the state.
+ * - {@link WebSocketServer} when in state:server: "client:open" → {@link sendOutgoingMessages}
+ * - {@link WebSocketServer} when in state:server: "client:message" → means a message came from a client, so it should go to all {@link WebSocketBroadcastChannel}s in {@link channelSets} for the message's channel name, and to all {@link server.webSockets}.
+ * - {@link WebSocketServer} when in state:server: {@link server.finished} → state:client
+ * - {@link WebSocket} when in state:client: "open" → {@link sendOutgoingMessages}
+ * - {@link WebSocket} when in state:client: "message" → means a message came from the server, so it should go to all {@link WebSocketBroadcastChannel}s in {@link channelSets} for the message's channel name.
+ * - {@link WebSocket} when in state:client: "close" → state:client closed
+ * - {@link WebSocket} when in state:client: "error" → state:client closed
+ */
 export class WebSocketClientServer extends EventTarget implements Disposable {
   private readonly log1: Logger;
   readonly channelSets: Map<string, Set<WebSocketBroadcastChannel>> = new Map();
@@ -31,8 +57,40 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   readonly abortController: AbortController = new AbortController();
   private server?: WebSocketServer;
   private ws?: WebSocket;
-  private outgoingMessages: LocalMultiplexMessage[] = [];
+  private yetUndeliveredMessages: MultiplexMessage[] = [];
   readonly url: IdUrl;
+
+  constructor(url: IdUrl, autoStart = true) {
+    super();
+    this.log1 = log0.sub(WebSocketClientServer.name).sub(url.toString());
+    this.url = url;
+    this.state = this.createClientServerStateMachine();
+    this.abortController.signal.addEventListener(
+      "abort",
+      () => {
+        this.dispatchEvent(new CloseEvent("close"));
+        this.close();
+      },
+      { once: true },
+    );
+    if (autoStart) {
+      this.state.transitionToNextNonFinalState();
+    }
+  }
+
+  [Symbol.dispose](): void {
+    this.close();
+  }
+
+  close(): void {
+    if (!this.abortController.signal.aborted) {
+      this.abortController.abort();
+      return;
+    }
+
+    this.cleanup();
+    this.state.transitionTo("closed");
+  }
 
   private cleanup() {
     this.server?.close();
@@ -57,26 +115,24 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         log3(WebSocketClientServer.prototype.sendOutgoingMessages.name);
         this.sendOutgoingMessages();
       });
-      this.server.addEventListener("client:message", (event: Event) => {
-        const log3: Logger = log2.sub("client:message");
-        if (!(event instanceof WebSocketClientMessageEvent)) {
-          throw new Error("Expected WebSocketClientMessageEvent");
-        }
-        const message: LocalMultiplexMessage = JSON.parse(
-          event.data.clientEvent.data,
-        );
-        log3(`received message ${ss(message)} from ${s(event.data.url)}`);
 
-        log3(WebSocketClientServer.prototype.dispatchEvent.name);
-        this.dispatchEvent(new MessageEvent("message", { data: message }));
-
-        log3(WebSocketClientServer.prototype.postMessage.name);
-        this.postMessage(message);
-      });
       this.server.finished.then(() => {
         const log3: Logger = log2.sub("this.server.finished");
         log3("server finished");
-        this.state.transitionTo("server failed");
+        this.state.transitionTo("server closed");
+      });
+
+      this.server.addEventListener("client:message", (event: Event) => {
+        const log3: Logger = log2.sub("client:message");
+        const message: MultiplexMessage = extractAnyMultiplexMessage(event);
+        log3(
+          `received message ${ss(message)} from ${s(message.from)} on channel ${
+            s(message.channel)
+          }`,
+        );
+
+        log3(WebSocketClientServer.prototype.broadcast.name);
+        this.broadcast(message);
       });
 
       return this.state.transitionTo("server");
@@ -84,9 +140,10 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
       const log3: Logger = log2.sub("catch");
       if (error instanceof Deno.errors.AddrInUse) {
         log3("address in use");
-        return this.state.transitionTo("server failed");
+        return this.state.transitionTo("server closed");
       }
-      throw error;
+      log3(`error: ${ss(error)}`);
+      return this.state.transitionTo("server closed");
     }
   }
 
@@ -99,31 +156,36 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
 
     log2(`connecting to ${s(this.url)}...`);
     this.ws = new WebSocket(this.url);
+
     this.ws.addEventListener("open", () => {
       const log3: Logger = log2.sub("open");
       log3("connected");
       this.state.transitionTo("client");
     });
+
     this.ws.addEventListener("error", (event) => {
       const log3: Logger = log2.sub("error");
       log3(`event: ${ss(event)}`);
-      this.state.transitionTo("client failed");
+      this.state.transitionTo("client closed");
     });
+
     this.ws.addEventListener("close", () => {
       const log3: Logger = log2.sub("close");
       log3("closed");
-      this.state.transitionTo("client failed");
+      this.state.transitionTo("client closed");
     });
+
     this.ws.addEventListener("message", (event: Event) => {
       const log3: Logger = log2.sub("message");
-      if (!(event instanceof MessageEvent)) {
-        throw new Error("Expected MessageEvent");
-      }
-      const message: LocalMultiplexMessage = JSON.parse(event.data);
-      log3(`received message ${ss(message)}`);
+      const message: MultiplexMessage = extractAnyMultiplexMessage(event);
+      log3(
+        `received message ${ss(message)} from ${s(message.from)} on channel ${
+          s(message.channel)
+        }`,
+      );
 
-      log3(WebSocketClientServer.prototype.dispatchEvent.name);
-      this.dispatchEvent(new MessageEvent("message", { data: message }));
+      log3(WebSocketClientServer.prototype.broadcast.name);
+      this.broadcast(message);
     });
   }
 
@@ -133,19 +195,19 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     }
   }
 
-  private doSendOutgoingMessage(message: LocalMultiplexMessage) {
+  private doSendOutgoingMessage(message: MultiplexMessage) {
     const data: string = JSON.stringify(message);
     this.ws?.send(data);
     this.server?.broadcast(data);
   }
 
-  private *outgoingMessagesToSend(): Generator<LocalMultiplexMessage> {
+  private *outgoingMessagesToSend(): Generator<MultiplexMessage> {
     while (
       !this.abortController.signal.aborted &&
-      this.outgoingMessages.length > 0 &&
+      this.yetUndeliveredMessages.length > 0 &&
       this.state.is("client", "server")
     ) {
-      const message = this.outgoingMessages.shift();
+      const message = this.yetUndeliveredMessages.shift();
       if (message !== undefined) {
         yield message;
       }
@@ -173,12 +235,12 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         },
         {
           from: "start server",
-          to: "server failed",
+          to: "server closed",
           fn: StateMachine.gotoFn(() => this.state, "client wannabe"),
         },
         {
           from: "server",
-          to: "server failed",
+          to: "server closed",
           fn: StateMachine.gotoFn(() => this.state, "client wannabe"),
         },
         {
@@ -187,7 +249,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           fn: StateMachine.gotoFn(() => this.state, "connect client"),
         },
         {
-          from: "server failed",
+          from: "server closed",
           to: "client wannabe",
           fn: StateMachine.gotoFn(() => this.state, "connect client"),
         },
@@ -208,21 +270,21 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         },
         {
           from: "connect client",
-          to: "client failed",
+          to: "client closed",
           fn: StateMachine.gotoFn(() => this.state, "server wannabe"),
         },
         {
           from: "client",
-          to: "client failed",
+          to: "client closed",
           fn: StateMachine.gotoFn(() => this.state, "server wannabe"),
         },
         {
-          from: "client failed",
+          from: "client closed",
           to: "server wannabe",
           fn: StateMachine.gotoFn(() => this.state, "start server"),
         },
         {
-          from: "client failed",
+          from: "client closed",
           to: "closed",
           fn: this.close.bind(this),
         },
@@ -252,7 +314,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
           fn: this.close.bind(this),
         },
         {
-          from: "server failed",
+          from: "server closed",
           to: "closed",
           fn: this.close.bind(this),
         },
@@ -275,30 +337,9 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     );
   }
 
-  constructor(url: IdUrl, autoStart = true) {
-    super();
-    this.log1 = log0.sub(WebSocketClientServer.name).sub(url.toString());
-    this.url = url;
-    this.state = this.createClientServerStateMachine();
-    this.abortController.signal.addEventListener(
-      "abort",
-      this.close.bind(this),
-    );
-    if (autoStart) {
-      this.state.transitionToNextNonFinalState();
-    }
-  }
-
-  [Symbol.dispose](): void {
-    this.close();
-  }
-
-  close(): void {
-    this.cleanup();
-    this.state.transitionTo("closed");
-  }
-
-  ensureChannelSet(channelName: string): Set<WebSocketBroadcastChannel> {
+  private ensureChannelSet(
+    channelName: string,
+  ): Set<WebSocketBroadcastChannel> {
     const existingChannelSet = this.channelSets.get(channelName);
     if (existingChannelSet) {
       return existingChannelSet;
@@ -309,36 +350,47 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     }
   }
 
-  getChannelSetOrEmpty(channelName: string): Set<WebSocketBroadcastChannel> {
+  private getChannelSetOrEmpty(
+    channelName: string,
+  ): Set<WebSocketBroadcastChannel> {
     return this.channelSets.get(channelName) ??
       new Set<WebSocketBroadcastChannel>();
   }
 
-  registerChannel(broadcastChannel: WebSocketBroadcastChannel) {
+  private registerChannel(broadcastChannel: WebSocketBroadcastChannel) {
+    broadcastChannel.addEventListener("close", () => {
+      this.unregisterChannel(broadcastChannel);
+    }, { once: true });
+
     this.ensureChannelSet(broadcastChannel.name).add(broadcastChannel);
   }
 
-  unregisterChannel(broadcastChannel: WebSocketBroadcastChannel) {
-    this.getChannelSetOrEmpty(broadcastChannel.name).delete(broadcastChannel);
-    if (this.getChannelSetOrEmpty(broadcastChannel.name).size === 0) {
+  private unregisterChannel(broadcastChannel: WebSocketBroadcastChannel) {
+    const channelSetOrEmpty: Set<WebSocketBroadcastChannel> = this
+      .getChannelSetOrEmpty(broadcastChannel.name);
+    channelSetOrEmpty.delete(broadcastChannel);
+    if (channelSetOrEmpty.size === 0) {
       this.channelSets.delete(broadcastChannel.name);
+    }
+    if (this.channelSets.size === 0) {
+      this.close();
     }
   }
 
-  postMessage(message: LocalMultiplexMessage) {
+  broadcast(message: MultiplexMessage) {
     const log1 = this.log1.sub(
-      WebSocketClientServer.prototype.postMessage.name,
+      WebSocketClientServer.prototype.broadcast.name,
     );
     log1(`message: ${ss(message)}`);
 
     log1(WebSocketClientServer.prototype.postMessageLocal.name);
     this.postMessageLocal(message);
 
-    this.outgoingMessages.push(message);
+    this.yetUndeliveredMessages.push(message);
     this.sendOutgoingMessages();
   }
 
-  private postMessageLocal(message: LocalMultiplexMessage) {
+  private postMessageLocal(message: MultiplexMessage) {
     const log1 = this.log1.sub(
       WebSocketClientServer.prototype.postMessageLocal.name,
     );
@@ -356,5 +408,12 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         new MessageEvent("message", { data: message.message }),
       );
     }
+  }
+
+  createBroadcastChannel(name: string): WebSocketBroadcastChannel {
+    const broadcastChannel: WebSocketBroadcastChannel =
+      new WebSocketBroadcastChannel(IdUrlChannel.of(this.url, name));
+    this.registerChannel(broadcastChannel);
+    return broadcastChannel;
   }
 }

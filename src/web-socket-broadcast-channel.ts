@@ -1,7 +1,9 @@
 import { s } from "./fn.ts";
 import { Logger, logger } from "./log.ts";
-import { WebSocketClientServer } from "./web-socket-client-server.ts";
-import { LocalMultiplexMessage } from "./multiplex-message.ts";
+import {
+  createMultiplexMessage,
+  MultiplexMessage,
+} from "./multiplex-message.ts";
 import { BroadcastChannelIsh } from "./types.ts";
 import { Disposable, Symbol } from "./using.ts";
 import { OneTimeFuse } from "./one-time-fuse.ts";
@@ -35,7 +37,6 @@ export class WebSocketBroadcastChannel extends EventTarget
   onmessage: ((ev: Event) => void) | null = null;
   onmessageerror: ((ev: Event) => void) | null = null;
   private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
-  private readonly clientServer: WebSocketClientServer;
   private closeFuse = new OneTimeFuse("channel is already closed");
   get name(): string {
     return this.idUrlChannel.channel;
@@ -47,25 +48,22 @@ export class WebSocketBroadcastChannel extends EventTarget
 
   /**
    * Creates a {@link WebSocketBroadcastChannel}.
-   * @param clientServer The {@link WebSocketClientServer} to use for communicating with other instances.
-   * @param name The name of the channel.
+   * @param urlAndChannelName
    */
-  constructor(clientServer: WebSocketClientServer, name: string) {
+  constructor(urlAndChannelName: IdUrlChannel) {
     super();
-    this.log.sub("constructor")(`name: ${s(name)}`);
-    this.idUrlChannel = IdUrlChannel.of(clientServer.url, name);
+    this.log.sub("constructor")(`name: ${s(urlAndChannelName.channel)}`);
+    this.idUrlChannel = urlAndChannelName;
     this.addEventListener("message", (e: Event) => this.onmessage?.(e));
     this.addEventListener(
       "messageerror",
       (e: Event) => this.onmessageerror?.(e),
     );
-
-    this.clientServer = clientServer;
   }
 
   postMessage(message: string): void {
     const log1 = this.log.sub(
-      this.clientServer.constructor.prototype.postMessage.name,
+      WebSocketBroadcastChannel.prototype.postMessage.name,
     );
     log1(`message: ${s(message)}`);
     if (this.closeFuse.isBlown) {
@@ -73,16 +71,15 @@ export class WebSocketBroadcastChannel extends EventTarget
       return;
     }
 
-    const localMultiplexMessage = new LocalMultiplexMessage(this, message);
-    log1(
-      `this.clientServer(${
-        s(this.url)
-      }).${this.clientServer.constructor.prototype.postMessage.name}(${
-        s(localMultiplexMessage)
-      })`,
+    const multiplexMessage: MultiplexMessage = createMultiplexMessage(
+      this,
+      message,
     );
-    this.clientServer.postMessage(localMultiplexMessage);
+    this.dispatchEvent(
+      new MessageEvent("postMessage", { data: multiplexMessage }),
+    );
   }
+
   [Symbol.dispose](): void {
     const log1 = this.log.sub(
       this.constructor.prototype[Symbol.dispose].name,
@@ -90,6 +87,7 @@ export class WebSocketBroadcastChannel extends EventTarget
     log1("disposing channel, via close()...");
     this.close();
   }
+
   close(): void {
     const log1 = this.log.sub(this.constructor.prototype.close.name);
     if (this.closeFuse.isBlown) {

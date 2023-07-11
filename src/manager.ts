@@ -12,6 +12,16 @@ import { equals } from "./fn.ts";
 
 const log0: Logger = logger(import.meta.url);
 
+/**
+ * Owns:
+ * - one {@link WebSocketClientServer}, per WebSocket url.
+ *
+ * Emits:
+ * - no events
+ *
+ * Listens to:
+ * - {@link WebSocketClientServer}: "close" → delete it from {@link clientServers}.
+ */
 export class Manager {
   private static readonly singletonFuse: OneTimeFuse = new OneTimeFuse(
     "Manager already instantiated. You only get one.",
@@ -49,16 +59,7 @@ export class Manager {
     const clientServer: WebSocketClientServer = this.ensureClientServer(
       IdUrl.of(url),
     );
-    const broadcastChannel = new WebSocketBroadcastChannel(clientServer, name);
-    clientServer.registerChannel(broadcastChannel);
-    broadcastChannel.addEventListener("close", () => {
-      clientServer.unregisterChannel(broadcastChannel);
-      if (clientServer.channelSets.size) {
-        clientServer.close();
-        this.clientServers.delete(clientServer.url);
-      }
-    });
-    return broadcastChannel;
+    return clientServer.createBroadcastChannel(name);
   }
 
   private ensureClientServer(url: IdUrl): WebSocketClientServer {
@@ -77,6 +78,11 @@ export class Manager {
     );
     const clientServer = new WebSocketClientServer(url);
     this.clientServers.set(url, clientServer);
+    clientServer.addEventListener("close", () => {
+      const log2: Logger = log1.sub("close");
+      log2("clientServer closed; deleting from this.clientServers...");
+      this.clientServers.delete(url);
+    });
     return clientServer;
   }
 }

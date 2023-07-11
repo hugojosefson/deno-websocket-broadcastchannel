@@ -10,36 +10,31 @@ const log0: Logger = logger(import.meta.url);
  * Internal message format for multiplexing messages over a single WebSocket, for several channels.
  */
 export interface MultiplexMessage {
+  /** Uuid of the WebSocketBroadcastChannel that sent the message. */
+  from: string;
+
+  /** Name of the WebSocketBroadcastChannel where the message is to be sent. */
   channel: string;
+
+  /** The message to be sent. */
   message: string;
 }
 
 /**
- * Adds information about which instance of WebSocketBroadcastChannel
- * this MultiplexMessage was sent from.
+ * Creates a MultiplexMessage from the given WebSocketBroadcastChannel and message.
+ * @param from WebSocketBroadcastChannel that sends the message.
+ * @param message Message to be sent.
  */
-export class LocalMultiplexMessage implements MultiplexMessage {
-  public readonly from: string;
-  public readonly channel: string;
-  public readonly message: string;
-
-  constructor(
-    from: WebSocketBroadcastChannel,
-    message: string,
-  ) {
-    this.from = from.uuid;
-    this.channel = from.name;
-    this.message = message;
-  }
-
-  serialize(): string {
-    return JSON.stringify({
-      channel: this.channel,
-      message: this.message,
-    });
-  }
+export function createMultiplexMessage(
+  from: WebSocketBroadcastChannel,
+  message: string,
+): MultiplexMessage {
+  return {
+    from: from.uuid,
+    channel: from.name,
+    message,
+  };
 }
-
 /**
  * Checks whether the given message is a MultiplexMessage.
  * @param message possibly a MultiplexMessage.
@@ -53,16 +48,19 @@ export function isMultiplexMessage(
   const typeofMessage = typeof message;
   const messageIsNotNull = message !== null;
   const partialMultiplexMessage = message as Partial<MultiplexMessage>;
+  const typeofMessageFrom = typeof partialMultiplexMessage?.from;
   const typeofMessageChannel = typeof partialMultiplexMessage?.channel;
   const typeofMessageMessage = typeof partialMultiplexMessage?.message;
 
   const verdict: boolean = typeofMessage === "object" &&
     messageIsNotNull &&
+    typeofMessageFrom === "string" &&
     typeofMessageChannel === "string" &&
     typeofMessageMessage === "string";
 
   log1(`typeof message: ${s(typeofMessage)}`);
   log1(`message !== null: ${s(messageIsNotNull)}`);
+  log1(`typeof message?.from: ${s(typeofMessageFrom)}`);
   log1(`typeof message?.channel: ${s(typeofMessageChannel)}`);
   log1(`typeof message?.message: ${s(typeofMessageMessage)}`);
   log1("verdict", verdict);
@@ -75,7 +73,9 @@ export function isMultiplexMessage(
  * Throws if the event does not contain a MultiplexMessage.
  * @param event
  */
-export function extractAnyMultiplexMessage(event: Event): MultiplexMessage {
+export function extractAnyMultiplexMessage(
+  event: Event,
+): MultiplexMessage | never {
   const log1 = log0.sub(extractAnyMultiplexMessage.name);
   log1("event.constructor.name", event.constructor.name);
   try {
