@@ -1,5 +1,5 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env=PORT --watch
-import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.193.0/http/server.ts";
 import { Manager } from "../mod.ts";
 
 const messages: string[] = [];

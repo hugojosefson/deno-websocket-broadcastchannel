@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env
 import { Manager } from "../mod.ts";
-import { deferred } from "https://deno.land/std@0.192.0/async/deferred.ts";
+import { deferred } from "https://deno.land/std@0.193.0/async/deferred.ts";
 import { s, sleep, ss } from "../src/fn.ts";
 import { CommandFailureError } from "https://deno.land/x/run_simple@2.1.0/src/run.ts";
 

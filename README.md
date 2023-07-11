@@ -118,7 +118,7 @@ https://deno.com/deploy/docs/runtime-broadcast-channel#example
 Adapted to use this module:
 
 ```typescript
-import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.193.0/http/server.ts";
 import { Manager } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
 
 const messages: string[] = [];
