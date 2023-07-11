@@ -241,17 +241,72 @@ describe("websocket-broadcastchannel", () => {
           ], { stdin: "hello from 2" }),
         ];
         const [result0, result1, result2]: [string, string, string] =
-          (await Promise.all(promises).catch((e) => {
-            console.error(e);
-            throw e;
-          })).map((result) => result.split("\n").sort().join("\n")) as [
-            string,
-            string,
-            string,
-          ];
+          (await Promise.all(promises))
+            .map(
+              (result) =>
+                result
+                  .split("\n")
+                  .sort()
+                  .join("\n"),
+            ) as [string, string, string];
         assertEquals(s(result0), s("hello from 1\nhello from 2"));
         assertEquals(s(result1), s("hello from 0\nhello from 2"));
         assertEquals(s(result2), s("hello from 0\nhello from 1"));
+      } catch (e) {
+        if (e instanceof CommandFailureError) {
+          console.error(ss(e));
+        } else {
+          console.error(e);
+        }
+        throw e;
+      }
+    });
+    it("4 processes, 1 instance each, split over 2 channel names", async () => {
+      try {
+        const promises: [
+          Promise<string>,
+          Promise<string>,
+          Promise<string>,
+          Promise<string>,
+        ] = [
+          run([
+            new URL("./one-channel.ts", import.meta.url).pathname,
+            "chat",
+            1,
+          ], { stdin: "hello from 0" }),
+          run([
+            new URL("./one-channel.ts", import.meta.url).pathname,
+            "chat",
+            1,
+          ], { stdin: "hello from 1" }),
+          run([
+            new URL("./one-channel.ts", import.meta.url).pathname,
+            "chat2",
+            1,
+          ], { stdin: "hello from 2" }),
+          run([
+            new URL("./one-channel.ts", import.meta.url).pathname,
+            "chat2",
+            1,
+          ], { stdin: "hello from 3" }),
+        ];
+        const [result0, result1, result2, result3]: [
+          string,
+          string,
+          string,
+          string,
+        ] = (await Promise.all(promises))
+          .map(
+            (result) =>
+              result
+                .split("\n")
+                .sort()
+                .join("\n"),
+          ) as [string, string, string, string];
+        assertEquals(s(result0), s("hello from 1"));
+        assertEquals(s(result1), s("hello from 0"));
+        assertEquals(s(result2), s("hello from 3"));
+        assertEquals(s(result3), s("hello from 2"));
       } catch (e) {
         if (e instanceof CommandFailureError) {
           console.error(ss(e));
