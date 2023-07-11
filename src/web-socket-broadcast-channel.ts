@@ -38,7 +38,7 @@ const log0: Logger = logger(import.meta.url);
 export class WebSocketBroadcastChannel extends EventTarget
   implements BroadcastChannelIsh, Disposable {
   readonly uuid: string = crypto.randomUUID();
-  onmessage: ((ev: MessageEvent) => void) | null = null;
+  onmessage: ((ev: Event) => void) | null = null;
   onmessageerror: ((ev: Event) => void) | null = null;
   private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
   private closeFuse = new OneTimeFuse("channel is already closed");
@@ -57,10 +57,7 @@ export class WebSocketBroadcastChannel extends EventTarget
     super();
     this.log.sub("constructor")(`name: ${s(name)}, url: ${s(url)}`);
     this.idUrlChannel = IdUrlChannel.of(IdUrl.of(url), name);
-    this.addEventListener(
-      "message",
-      (e: Event) => this.onmessage?.(e as MessageEvent),
-    );
+    this.addEventListener("message", (e: Event) => this.onmessage?.(e));
     this.addEventListener(
       "messageerror",
       (e: Event) => this.onmessageerror?.(e),

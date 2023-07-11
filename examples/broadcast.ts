@@ -1,5 +1,5 @@
 #!/usr/bin/env -S deno run --allow-net --watch
-import { WebSocketBroadcastChannel } from "../mod.ts";
+import { createBroadcastChannel } from "../mod.ts";
 
 const pid = Deno.pid;
 const pidLastDigit = pid % 10;
@@ -12,7 +12,7 @@ const log = (s: string, ...args: unknown[]) => {
 log("run this in multiple terminals on the same host, to see it work");
 
 log("starting...");
-const testChannel = new WebSocketBroadcastChannel("test");
+const testChannel = createBroadcastChannel("test");
 log("testChannel.constructor.name", testChannel.constructor.name);
 
 testChannel.onmessage = (event: MessageEvent<unknown>) => {

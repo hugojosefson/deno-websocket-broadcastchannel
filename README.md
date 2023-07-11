@@ -64,7 +64,7 @@ function to create the relevant `BroadcastChannel` object, and then uses the
 `BroadcastChannel` API as usual.
 
 ```typescript
-import { WebSocketBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
+import { createBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
 
 const pid = Deno.pid;
 const pidLastDigit = pid % 10;
@@ -77,7 +77,7 @@ const log = (s: string, ...args: unknown[]) => {
 log("run this in multiple terminals on the same host, to see it work");
 
 log("starting...");
-const testChannel = new WebSocketBroadcastChannel("test");
+const testChannel = createBroadcastChannel("test");
 log("testChannel.constructor.name", testChannel.constructor.name);
 
 testChannel.onmessage = (event: MessageEvent<unknown>) => {
