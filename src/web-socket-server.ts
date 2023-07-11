@@ -71,24 +71,28 @@ export class WebSocketServer extends EventTarget implements Deno.Closer {
 
     log2(`creating server for ${s(url)}...`);
     this.abortController = orSignalController(signal);
-    this.abortController.signal.addEventListener("abort", () => {
-      log2("closing webSockets...");
-      safely(() => {
-        log2(`closing ${this.webSockets.size} webSockets...`);
-        for (const ws of this.webSockets) {
-          safely(() => {
-            log2(`closing webSocket...`);
-            ws.close();
-            log2(`closed webSocket`);
-          });
-        }
-        log2(`closed clients`);
-      });
+    this.abortController.signal.addEventListener(
+      "abort",
+      () => {
+        log2("closing webSockets...");
+        safely(() => {
+          log2(`closing ${this.webSockets.size} webSockets...`);
+          for (const ws of this.webSockets) {
+            safely(() => {
+              log2(`closing webSocket...`);
+              ws.close();
+              log2(`closed webSocket`);
+            });
+          }
+          log2(`closed clients`);
+        });
 
-      log2(`clearing ${this.webSockets.size} clients...`);
-      this.webSockets.clear();
-      log2(`cleared clients, ${this.webSockets.size} clients remain`);
-    });
+        log2(`clearing ${this.webSockets.size} clients...`);
+        this.webSockets.clear();
+        log2(`cleared clients, ${this.webSockets.size} clients remain`);
+      },
+      { once: true },
+    );
 
     this.server = serveWebSocket(
       {
@@ -140,42 +144,54 @@ export class WebSocketServer extends EventTarget implements Deno.Closer {
     );
     log2("ws.open; dispatched client:open event");
 
-    ws.addEventListener("close", (clientEvent: Event) => {
-      log2(`ws.close; got close event`, clientEvent);
-      log2(
-        `ws.close; deleting client from set of ${this.webSockets.size} clients...`,
-      );
-      this.webSockets.delete(ws);
-      log2(
-        `ws.close; deleted client from set of ${this.webSockets.size} clients`,
-      );
-      log2("ws.close; dispatching client:close event...");
-      this.dispatchEvent(
-        new WebSocketClientEvent("client:close", ws, req.url, clientEvent),
-      );
-      log2("ws.close; dispatched client:close event");
-    });
-
-    ws.addEventListener("message", (clientEvent: MessageEvent) => {
+    const onMessage: EventListener = (clientEvent: Event) => {
+      if (!(clientEvent instanceof MessageEvent)) {
+        log2("ws.message; ignoring non-MessageEvent client event", clientEvent);
+        return;
+      }
       log2("ws.message; dispatching client:message event...");
       this.dispatchEvent(
         new WebSocketClientMessageEvent(
           "client:message",
           ws,
           req.url,
-          clientEvent,
+          clientEvent as MessageEvent,
         ),
       );
       log2("ws.message; dispatched client:message event");
-    });
+    };
 
-    ws.addEventListener("error", (clientEvent: Event) => {
+    const onError: EventListener = (clientEvent: Event) => {
       log2("ws.error; dispatching client:error event...", clientEvent);
       this.dispatchEvent(
         new WebSocketClientEvent("client:error", ws, req.url, clientEvent),
       );
       log2("ws.error; dispatched client:error event");
-    });
+    };
+
+    ws.addEventListener("message", onMessage);
+    ws.addEventListener("error", onError);
+    ws.addEventListener(
+      "close",
+      (clientEvent: Event) => {
+        log2(`ws.close; got close event`, clientEvent);
+        ws.removeEventListener("message", onMessage);
+        ws.removeEventListener("error", onError);
+        log2(
+          `ws.close; deleting client from set of ${this.webSockets.size} clients...`,
+        );
+        this.webSockets.delete(ws);
+        log2(
+          `ws.close; deleted client from set of ${this.webSockets.size} clients`,
+        );
+        log2("ws.close; dispatching client:close event...");
+        this.dispatchEvent(
+          new WebSocketClientEvent("client:close", ws, req.url, clientEvent),
+        );
+        log2("ws.close; dispatched client:close event");
+      },
+      { once: true },
+    );
   }
 
   close(): void {

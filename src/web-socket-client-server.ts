@@ -111,19 +111,13 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
       log2(`creating new ${WebSocketServer.name} on ${s(this.url)}...`);
       this.server = new WebSocketServer(this.url, this.abortController.signal);
 
-      this.server.addEventListener("client:open", () => {
+      const onClientOpen: EventListener = () => {
         const log3: Logger = log2.sub("client:open");
         log3(WebSocketClientServer.prototype.sendOutgoingMessages.name);
         this.sendOutgoingMessages();
-      });
+      };
 
-      this.server.finished.then(() => {
-        const log3: Logger = log2.sub("this.server.finished");
-        log3("server finished");
-        this.state.transitionTo("server closed");
-      });
-
-      this.server.addEventListener("client:message", (event: Event) => {
+      const onClientMessage: EventListener = (event: Event) => {
         const log3: Logger = log2.sub("client:message");
         const message: MultiplexMessage = extractAnyMultiplexMessage(event);
         log3(
@@ -134,6 +128,17 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
 
         log3(WebSocketClientServer.prototype.broadcast.name);
         this.broadcast(message);
+      };
+
+      this.server.addEventListener("client:open", onClientOpen);
+      this.server.addEventListener("client:message", onClientMessage);
+
+      this.server.finished.then(() => {
+        const log3: Logger = log2.sub("this.server.finished");
+        log3("server finished");
+        this.server?.removeEventListener("client:open", onClientOpen);
+        this.server?.removeEventListener("client:message", onClientMessage);
+        this.state.transitionTo("server closed");
       });
 
       return this.state.transitionTo("server");
@@ -158,25 +163,18 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     log2(`connecting to ${s(this.url)}...`);
     this.ws = new WebSocket(this.url);
 
-    this.ws.addEventListener("open", () => {
+    const onOpen: EventListener = () => {
       const log3: Logger = log2.sub("open");
       log3("connected");
       this.state.transitionTo("client");
-    });
+    };
 
-    this.ws.addEventListener("error", (event) => {
+    const onError: EventListener = (event) => {
       const log3: Logger = log2.sub("error");
       log3(`event: ${ss(event)}`);
-      this.state.transitionTo("client closed");
-    });
+    };
 
-    this.ws.addEventListener("close", () => {
-      const log3: Logger = log2.sub("close");
-      log3("closed");
-      this.state.transitionTo("client closed");
-    });
-
-    this.ws.addEventListener("message", (event: Event) => {
+    const onMessage: EventListener = (event: Event) => {
       const log3: Logger = log2.sub("message");
       const message: MultiplexMessage = extractAnyMultiplexMessage(event);
       log3(
@@ -187,7 +185,22 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
 
       log3(WebSocketClientServer.prototype.postMessageLocal.name);
       this.postMessageLocal(message);
-    });
+    };
+
+    const onClose: EventListener = () => {
+      const log3: Logger = log2.sub("close");
+      log3("closed");
+      this.ws?.removeEventListener("error", onError);
+      this.ws?.removeEventListener("message", onMessage);
+      if (this.state.mayTransitionTo("client closed")) {
+        this.state.transitionTo("client closed");
+      }
+    };
+
+    this.ws.addEventListener("open", onOpen, { once: true });
+    this.ws.addEventListener("error", onError);
+    this.ws.addEventListener("message", onMessage);
+    this.ws.addEventListener("close", onClose, { once: true });
   }
 
   private sendOutgoingMessages() {
@@ -359,19 +372,30 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   }
 
   private registerChannel(broadcastChannel: WebSocketBroadcastChannel) {
-    broadcastChannel.addEventListener("close", () => {
-      this.unregisterChannel(broadcastChannel);
-    }, { once: true });
+    broadcastChannel.addEventListener(
+      "close",
+      () => this.unregisterChannel(broadcastChannel),
+      { once: true },
+    );
 
-    broadcastChannel.addEventListener("postMessage", (event) => {
-      const message: MultiplexMessage = extractAnyMultiplexMessage(event);
-      this.broadcast(message);
-    });
-
+    broadcastChannel.addEventListener(
+      "postMessage",
+      this.onBroadcastChannelPostMessage,
+    );
     this.ensureChannelSet(broadcastChannel.name).add(broadcastChannel);
   }
 
+  private onBroadcastChannelPostMessage: EventListener = (event: Event) => {
+    const message: MultiplexMessage = extractAnyMultiplexMessage(event);
+    this.broadcast(message);
+  };
+
   private unregisterChannel(broadcastChannel: WebSocketBroadcastChannel) {
+    broadcastChannel.removeEventListener(
+      "postMessage",
+      this.onBroadcastChannelPostMessage,
+    );
+
     const channelSetOrEmpty: Set<WebSocketBroadcastChannel> = this
       .getChannelSetOrEmpty(broadcastChannel.name);
     channelSetOrEmpty.delete(broadcastChannel);

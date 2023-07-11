@@ -135,7 +135,7 @@ export function orSignalController(signal?: AbortSignal): AbortController {
   if (signal) {
     signal.addEventListener("abort", () => {
       controller.abort();
-    });
+    }, { once: true });
   }
   return controller;
 }

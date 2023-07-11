@@ -49,17 +49,20 @@ detection in your logs :)
 
   chat.addEventListener("message", handleIncoming);
 
-  log("continuously reading from stdin");
-  const decoder = new TextDecoder();
-  for await (const chunk of Deno.stdin.readable) {
-    const text = decoder.decode(chunk).trimEnd();
-    log("stdin text =", text);
-    chat.postMessage(text);
-  }
+  try {
+    log("continuously reading from stdin");
+    const decoder = new TextDecoder();
+    for await (const chunk of Deno.stdin.readable) {
+      const text = decoder.decode(chunk).trimEnd();
+      log("stdin text =", text);
+      chat.postMessage(text);
+    }
 
-  log("stdin closed, closing chat");
-  chat.removeEventListener("message", handleIncoming);
-  chat.close();
+    log("stdin closed, closing chat");
+  } finally {
+    chat.removeEventListener("message", handleIncoming);
+    chat.close();
+  }
 
   log("Done.");
 }

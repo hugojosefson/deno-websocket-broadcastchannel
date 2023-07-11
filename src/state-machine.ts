@@ -455,4 +455,8 @@ export class StateMachine<
   is(...either: S[]): boolean {
     return either.includes(this._state);
   }
+
+  mayTransitionTo(to: S, from?: S): boolean {
+    return this.getAvailableTransitions(from).includes(to);
+  }
 }

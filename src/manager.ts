@@ -82,7 +82,7 @@ export class Manager {
       const log2: Logger = log1.sub("close");
       log2("clientServer closed; deleting from this.clientServers...");
       this.clientServers.delete(url);
-    });
+    }, { once: true });
     return clientServer;
   }
 }

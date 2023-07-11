@@ -116,7 +116,7 @@ export function serveWebSocket(
       const upgrade: Deno.WebSocketUpgrade = Deno.upgradeWebSocket(request);
       upgrade.socket.addEventListener("open", () => {
         void webSocketHandler(upgrade.socket, request, info);
-      });
+      }, { once: true });
       return upgrade.response;
     } else {
       return effectiveOptions.handler(request, info);

@@ -197,10 +197,12 @@ describe("websocket-broadcastchannel", () => {
           run([
             new URL("./one-channel.ts", import.meta.url).pathname,
             "chat",
+            1,
           ], { stdin: "hello from 0" }),
           run([
             new URL("./one-channel.ts", import.meta.url).pathname,
             "chat",
+            1,
           ], { stdin: "hello from 1" }),
         ];
         const [result0, result1]: [string, string] = await Promise.all(promises)
@@ -210,6 +212,46 @@ describe("websocket-broadcastchannel", () => {
           });
         assertEquals(s(result0), s("hello from 1"));
         assertEquals(s(result1), s("hello from 0"));
+      } catch (e) {
+        if (e instanceof CommandFailureError) {
+          console.error(ss(e));
+        } else {
+          console.error(e);
+        }
+        throw e;
+      }
+    });
+    it("3 processes, 1 instance each, same channel name", async () => {
+      try {
+        const promises: [Promise<string>, Promise<string>, Promise<string>] = [
+          run([
+            new URL("./one-channel.ts", import.meta.url).pathname,
+            "chat",
+            2,
+          ], { stdin: "hello from 0" }),
+          run([
+            new URL("./one-channel.ts", import.meta.url).pathname,
+            "chat",
+            2,
+          ], { stdin: "hello from 1" }),
+          run([
+            new URL("./one-channel.ts", import.meta.url).pathname,
+            "chat",
+            2,
+          ], { stdin: "hello from 2" }),
+        ];
+        const [result0, result1, result2]: [string, string, string] =
+          (await Promise.all(promises).catch((e) => {
+            console.error(e);
+            throw e;
+          })).map((result) => result.split("\n").sort().join("\n")) as [
+            string,
+            string,
+            string,
+          ];
+        assertEquals(s(result0), s("hello from 1\nhello from 2"));
+        assertEquals(s(result1), s("hello from 0\nhello from 2"));
+        assertEquals(s(result2), s("hello from 0\nhello from 1"));
       } catch (e) {
         if (e instanceof CommandFailureError) {
           console.error(ss(e));

@@ -1,10 +1,16 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env
+import { parse } from "https://deno.land/std@0.193.0/flags/mod.ts";
 import { Manager } from "../mod.ts";
 import { deferred } from "https://deno.land/std@0.193.0/async/deferred.ts";
 import { s, sleep, ss } from "../src/fn.ts";
 import { CommandFailureError } from "https://deno.land/x/run_simple@2.1.0/src/run.ts";
 
-async function main(channelName = "chat") {
+const SLEEP_MULTIPLIER = Deno.isatty(Deno.stdin.rid) ? 100 : 1;
+const TOTAL_TIMEOUT = 500 * SLEEP_MULTIPLIER;
+const SLEEP_BEFORE_READING_STDIN = 50 * SLEEP_MULTIPLIER;
+const SLEEP_BEFORE_CLOSE = 50 * SLEEP_MULTIPLIER;
+
+async function main(channelName: string, expectedCount: number) {
   console.error(`pid: ${Deno.pid}`);
   console.error(`channelName: ${s(channelName)}`);
 
@@ -15,7 +21,7 @@ async function main(channelName = "chat") {
     console.error("timeout");
     bc.close();
     closed.reject(new Error("timeout"));
-  }, 5000);
+  }, TOTAL_TIMEOUT);
   void closed.then(() => clearTimeout(timeout));
 
   const bc = new Manager().createBroadcastChannel(channelName);
@@ -23,27 +29,31 @@ async function main(channelName = "chat") {
   bc.addEventListener("close", () => {
     console.error("bc closed");
     closed.resolve();
-  });
+  }, { once: true });
   bc.addEventListener("error", (e: Event) => {
     console.error("bc error", e);
     closed.reject(e);
-  });
+  }, { once: true });
   bc.addEventListener("open", () => {
     console.error("bc opened");
-  });
-  bc.addEventListener("message", (e: Event) => {
+  }, { once: true });
+
+  let receivedCount = 0;
+  const onMessage: EventListener = (e: Event) => {
     const message = (e as MessageEvent).data;
-    console.error(
-      "bc MMMMMMEEEEESSSSAAAAAGGGGGEEEEE",
-      message,
-    );
     console.log(message);
-    received.resolve();
-  });
+    receivedCount++;
+    if (receivedCount >= expectedCount) {
+      received.resolve();
+    }
+  };
+  bc.addEventListener("message", onMessage);
+  closed.finally(() => bc.removeEventListener("message", onMessage));
+
   console.error("waiting for message...");
 
   console.error("sleeping before reading from stdin...");
-  await sleep(100);
+  await sleep(SLEEP_BEFORE_READING_STDIN);
   const decoder = new TextDecoder();
   console.error("continuously reading from stdin");
   for await (const chunk of Deno.stdin.readable) {
@@ -58,6 +68,10 @@ async function main(channelName = "chat") {
   await received;
   console.error("received");
 
+  console.error("sleeping before closing...");
+  await sleep(SLEEP_BEFORE_CLOSE);
+  console.error("slept");
+
   console.error("closing chat");
   bc.close();
   console.error("closed chat");
@@ -70,8 +84,8 @@ async function main(channelName = "chat") {
 
 if (import.meta.main) {
   try {
-    const channelName: string | undefined = Deno.args[0];
-    await main(channelName);
+    const [channelName, expectedCount] = parse(Deno.args)._ as [string, number];
+    await main(channelName, expectedCount);
   } catch (e) {
     if (e instanceof CommandFailureError) {
       console.error(ss(e));
