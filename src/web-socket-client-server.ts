@@ -9,7 +9,6 @@ import { Disposable, Symbol } from "./using.ts";
 import { StateMachine } from "./state-machine.ts";
 import { WebSocketServer } from "./web-socket-server.ts";
 import { s, ss } from "./fn.ts";
-import { IdUrlChannel } from "./id-url-channel.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -373,7 +372,7 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
       new Set<WebSocketBroadcastChannel>();
   }
 
-  private registerChannel(broadcastChannel: WebSocketBroadcastChannel) {
+  registerChannel(broadcastChannel: WebSocketBroadcastChannel) {
     broadcastChannel.addEventListener(
       "close",
       () => this.unregisterChannel(broadcastChannel),
@@ -440,12 +439,5 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         new MessageEvent("message", { data: message.message }),
       );
     }
-  }
-
-  createBroadcastChannel(name: string): WebSocketBroadcastChannel {
-    const broadcastChannel: WebSocketBroadcastChannel =
-      new WebSocketBroadcastChannel(IdUrlChannel.of(this.url, name));
-    this.registerChannel(broadcastChannel);
-    return broadcastChannel;
   }
 }

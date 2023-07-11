@@ -8,6 +8,10 @@ import { BroadcastChannelIsh } from "./types.ts";
 import { Disposable, Symbol } from "./using.ts";
 import { OneTimeFuse } from "./one-time-fuse.ts";
 import { IdUrlChannel } from "./id-url-channel.ts";
+import { WebSocketClientServer } from "./web-socket-client-server.ts";
+import { IdUrl } from "./id-url.ts";
+import { defaultWebSocketUrl } from "./default-websocket-url.ts";
+import { ensureClientServer } from "./client-servers.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -48,17 +52,20 @@ export class WebSocketBroadcastChannel extends EventTarget
 
   /**
    * Creates a {@link WebSocketBroadcastChannel}.
-   * @param urlAndChannelName
    */
-  constructor(urlAndChannelName: IdUrlChannel) {
+  constructor(name: string, url: string | URL = defaultWebSocketUrl()) {
     super();
-    this.log.sub("constructor")(`name: ${s(urlAndChannelName.channel)}`);
-    this.idUrlChannel = urlAndChannelName;
+    this.log.sub("constructor")(`name: ${s(name)}, url: ${s(url)}`);
+    this.idUrlChannel = IdUrlChannel.of(IdUrl.of(url), name);
     this.addEventListener("message", (e: Event) => this.onmessage?.(e));
     this.addEventListener(
       "messageerror",
       (e: Event) => this.onmessageerror?.(e),
     );
+    const clientServer: WebSocketClientServer = ensureClientServer(
+      this.idUrlChannel.url,
+    );
+    clientServer.registerChannel(this);
   }
 
   postMessage(message: string): void {
