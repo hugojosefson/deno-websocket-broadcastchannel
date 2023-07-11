@@ -13,6 +13,12 @@ import { equals } from "./fn.ts";
 const log0: Logger = logger(import.meta.url);
 
 /**
+ * We want one {@link WebSocketClientServer} per WebSocket url.
+ * @private
+ */
+const clientServers: Map<IdUrl, WebSocketClientServer> = new Map();
+
+/**
  * Owns:
  * - one {@link WebSocketClientServer}, per WebSocket url.
  *
@@ -29,12 +35,6 @@ export class Manager {
   constructor() {
     Manager.singletonFuse.blow();
   }
-
-  /**
-   * We want one {@link WebSocketClientServer} per WebSocket url.
-   * @private
-   */
-  private readonly clientServers: Map<IdUrl, WebSocketClientServer> = new Map();
 
   /**
    * Creates a {@link BroadcastChannel} or {@link WebSocketBroadcastChannel}, depending on
@@ -65,8 +65,8 @@ export class Manager {
   private ensureClientServer(url: IdUrl): WebSocketClientServer {
     const log1: Logger = log0.sub(this.ensureClientServer.name).sub(url.href);
 
-    const existingClientServer: undefined | WebSocketClientServer = this
-      .clientServers.get(url);
+    const existingClientServer: undefined | WebSocketClientServer =
+      clientServers.get(url);
     log1("!!existingClientServer:", !!existingClientServer);
 
     if (existingClientServer) {
@@ -77,11 +77,11 @@ export class Manager {
       "existingClientServer === undefined; creating new WebSocketClientServer...",
     );
     const clientServer = new WebSocketClientServer(url);
-    this.clientServers.set(url, clientServer);
+    clientServers.set(url, clientServer);
     clientServer.addEventListener("close", () => {
       const log2: Logger = log1.sub("close");
-      log2("clientServer closed; deleting from this.clientServers...");
-      this.clientServers.delete(url);
+      log2("clientServer closed; deleting from clientServers...");
+      clientServers.delete(url);
     }, { once: true });
     return clientServer;
   }
