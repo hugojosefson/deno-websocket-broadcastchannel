@@ -251,7 +251,7 @@ function handleIncoming(event: Event): void {
     return;
   }
 
-  console.log(import.meta.url, event.data);
+  console.log(event.data);
 }
 
 if (import.meta.main) {

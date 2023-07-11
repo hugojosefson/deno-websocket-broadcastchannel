@@ -1,7 +1,7 @@
 import { Logger, logger } from "./log.ts";
 
 import { WebSocketClientMessageEvent } from "./web-socket-server.ts";
-import { s } from "./fn.ts";
+import { s, safely } from "./fn.ts";
 import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
 
 const log0: Logger = logger(import.meta.url);
@@ -85,7 +85,7 @@ export function extractAnyMultiplexMessage(
         log1("event.data is MultiplexMessage");
         return event.data as MultiplexMessage;
       }
-      const parsed = JSON.parse(event.data);
+      const parsed = safely(() => JSON.parse(event.data));
       log1(`parsed: ${s(parsed)}`);
       if (isMultiplexMessage(parsed)) {
         log1("parsed is MultiplexMessage");
@@ -93,12 +93,14 @@ export function extractAnyMultiplexMessage(
       }
       log1("parsed is not MultiplexMessage");
       log1(
-        `(event as WebSocketClientMessageEvent).data.clientEvent.data: ${
-          s((event as WebSocketClientMessageEvent).data.clientEvent.data)
+        `(event as WebSocketClientMessageEvent).data?.clientEvent?.data: ${
+          s((event as WebSocketClientMessageEvent).data?.clientEvent?.data)
         }`,
       );
-      const parsed2 = JSON.parse(
-        (event as WebSocketClientMessageEvent).data.clientEvent.data,
+      const parsed2 = safely(() =>
+        JSON.parse(
+          (event as WebSocketClientMessageEvent).data.clientEvent.data,
+        )
       );
       log1(`parsed2: ${s(parsed2)}`);
       if (isMultiplexMessage(parsed2)) {

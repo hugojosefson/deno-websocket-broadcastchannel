@@ -38,9 +38,14 @@ export function expectOnlyWebSocketUpgrade(): Response {
 }
 
 /** Default options for {@link serveWebSocket}. */
-export const defaultOptions: Partial<WebSocketSpecificOptions> = {
+export const defaultOptions: Partial<
+  ServeWebSocketOptions | ServeWebSocketTlsOptions
+> = {
   predicate: anyWebSocketUpgradeRequest,
   handler: expectOnlyWebSocketUpgrade,
+  onListen: ({ hostname, port }) => {
+    console.error(`Listening on ${hostname}:${port}.`);
+  },
 };
 
 /**
@@ -119,5 +124,5 @@ export function serveWebSocket(
   };
 
   /** Start the server. */
-  return Deno.serve(options, handlerWrappedWithPredicate);
+  return Deno.serve(effectiveOptions, handlerWrappedWithPredicate);
 }

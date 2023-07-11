@@ -4,8 +4,7 @@ import { deferred } from "https://deno.land/std@0.192.0/async/deferred.ts";
 import { s, sleep, ss } from "../src/fn.ts";
 import { CommandFailureError } from "https://deno.land/x/run_simple@2.1.0/src/run.ts";
 
-async function main() {
-  const [channelName] = Deno.args;
+async function main(channelName = "chat") {
   console.error(`pid: ${Deno.pid}`);
   console.error(`channelName: ${s(channelName)}`);
 
@@ -33,15 +32,18 @@ async function main() {
     console.error("bc opened");
   });
   bc.addEventListener("message", (e: Event) => {
+    const message = (e as MessageEvent).data;
     console.error(
       "bc MMMMMMEEEEESSSSAAAAAGGGGGEEEEE",
-      (e as MessageEvent).data,
+      message,
     );
-    console.log((e as MessageEvent).data);
+    console.log(message);
     received.resolve();
   });
   console.error("waiting for message...");
 
+  console.error("sleeping before reading from stdin...");
+  await sleep(100);
   const decoder = new TextDecoder();
   console.error("continuously reading from stdin");
   for await (const chunk of Deno.stdin.readable) {
@@ -56,25 +58,20 @@ async function main() {
   await received;
   console.error("received");
 
-  console.error("sleeping...");
-  await sleep(500);
-  console.error("slept");
   console.error("closing chat");
   bc.close();
   console.error("closed chat");
   console.error("waiting for closed...");
   await closed;
   console.error("closed");
-  console.error("sleeping...");
-  await sleep(500);
-  console.error("slept");
   console.error("exiting");
   Deno.exit(0);
 }
 
 if (import.meta.main) {
   try {
-    await main();
+    const channelName: string | undefined = Deno.args[0];
+    await main(channelName);
   } catch (e) {
     if (e instanceof CommandFailureError) {
       console.error(ss(e));

@@ -37,6 +37,7 @@ type ClientServerState =
  *
  * Emits:
  * - "close" when aborted or closed
+ * - {@link WebSocketBroadcastChannel}: "message" to deliver messages locally to {@link WebSocketBroadcastChannel}s
  *
  * Listens to:
  * - {@link AbortController}: "abort" → state:closed.
@@ -184,8 +185,8 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
         }`,
       );
 
-      log3(WebSocketClientServer.prototype.broadcast.name);
-      this.broadcast(message);
+      log3(WebSocketClientServer.prototype.postMessageLocal.name);
+      this.postMessageLocal(message);
     });
   }
 
@@ -361,6 +362,11 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
     broadcastChannel.addEventListener("close", () => {
       this.unregisterChannel(broadcastChannel);
     }, { once: true });
+
+    broadcastChannel.addEventListener("postMessage", (event) => {
+      const message: MultiplexMessage = extractAnyMultiplexMessage(event);
+      this.broadcast(message);
+    });
 
     this.ensureChannelSet(broadcastChannel.name).add(broadcastChannel);
   }

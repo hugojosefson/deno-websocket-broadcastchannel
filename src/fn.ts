@@ -91,12 +91,16 @@ export function ss(object: unknown): string {
 /**
  * Executes a function, but swallows any errors.
  * @param fn the function to execute, and ignore any errors from.
+ * @param defaultIfError the value to return if the function throws an error.
  */
-export function safely(fn: () => void): void {
+export function safely<T = void>(
+  fn: () => T,
+  defaultIfError: T | undefined = undefined,
+): T | undefined {
   try {
-    fn();
+    return fn();
   } catch (_ignore) {
-    // ignore
+    return defaultIfError;
   }
 }
 
