@@ -31,6 +31,7 @@ const log0: Logger = logger(import.meta.url);
  */
 export class WebSocketBroadcastChannel extends EventTarget
   implements BroadcastChannelIsh, Disposable {
+  readonly uuid: string = crypto.randomUUID();
   onmessage: ((ev: Event) => void) | null = null;
   onmessageerror: ((ev: Event) => void) | null = null;
   private readonly log: Logger = log0.sub(WebSocketBroadcastChannel.name);
@@ -61,6 +62,7 @@ export class WebSocketBroadcastChannel extends EventTarget
 
     this.clientServer = clientServer;
   }
+
   postMessage(message: string): void {
     const log1 = this.log.sub(
       this.clientServer.constructor.prototype.postMessage.name,

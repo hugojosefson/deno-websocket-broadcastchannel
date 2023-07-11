@@ -1,5 +1,8 @@
 import { equals, s } from "./fn.ts";
 import { PromiseQueue } from "./promise-queue.ts";
+import { Logger, logger } from "./log.ts";
+
+const log0: Logger = logger(import.meta.url);
 
 const INITIAL_STATE = `[*]`;
 const DEFAULT_ARROW = `-->`;
@@ -55,6 +58,8 @@ export class StateMachine<
       defaultOnDisallowedTransition<S>,
     allowedTransitions: TransitionDefinition<S>[] = [],
   ) {
+    const log1: Logger = log0.sub(`${StateMachine.name} constructor`);
+    log1(`initialState: ${s(initialState)}`);
     this._state = initialState;
     this.onDisallowedTransition = onDisallowedTransition;
     this.onBeforeTransition = onBeforeTransition;
@@ -76,9 +81,14 @@ export class StateMachine<
   }
 
   transitionTo(to: S): E | void | Promise<void> {
+    const log1: Logger = log0.sub(StateMachine.prototype.transitionTo.name);
+    log1(`to: ${s(to)}`);
+
     let transition: TransitionDefinition<S> = this.createTransition(to);
+    log1(`transition: ${s(transition)}`);
 
     /** enqueue transition if another transition is in progress */
+    log1(`this.promiseQueue.isWaiting: ${this.promiseQueue.isWaiting}`);
     if (this.promiseQueue.isWaiting) {
       return this.promiseQueue.enqueue(async () => {
         await this.transitionTo(to);
@@ -91,6 +101,7 @@ export class StateMachine<
       transition,
       this.createTransition.bind(this),
     );
+    log1(`transition: ${s(transition)}`);
 
     /** check if transition is allowed */
     if (transition.fn === undefined) {

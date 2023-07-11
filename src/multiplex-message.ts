@@ -19,13 +19,17 @@ export interface MultiplexMessage {
  * this MultiplexMessage was sent from.
  */
 export class LocalMultiplexMessage implements MultiplexMessage {
-  constructor(
-    public readonly from: WebSocketBroadcastChannel,
-    public readonly message: string,
-  ) {}
+  public readonly from: string;
+  public readonly channel: string;
+  public readonly message: string;
 
-  get channel(): string {
-    return this.from.name;
+  constructor(
+    from: WebSocketBroadcastChannel,
+    message: string,
+  ) {
+    this.from = from.uuid;
+    this.channel = from.name;
+    this.message = message;
   }
 
   serialize(): string {

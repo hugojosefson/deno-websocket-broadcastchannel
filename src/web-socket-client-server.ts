@@ -8,6 +8,7 @@ import {
   WebSocketClientMessageEvent,
   WebSocketServer,
 } from "./web-socket-server.ts";
+import { s, ss } from "./fn.ts";
 
 const log0: Logger = logger(import.meta.url);
 
@@ -41,39 +42,88 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   }
 
   private cleanupAndStartServerAndGotoServer() {
+    const log2: Logger = this.log1.sub(
+      WebSocketClientServer.prototype.cleanupAndStartServerAndGotoServer.name,
+    );
+    log2(WebSocketClientServer.prototype.cleanup.name);
     this.cleanup();
-    this.server = new WebSocketServer(this.url, this.abortController.signal);
 
-    this.server.addEventListener("client:open", () => {
-      this.sendOutgoingMessages();
-    });
-    this.server.addEventListener("client:message", (event: Event) => {
-      if (!(event instanceof WebSocketClientMessageEvent)) {
-        throw new Error("Expected WebSocketClientMessageEvent");
+    try {
+      log2(`creating new ${WebSocketServer.name} on ${s(this.url)}...`);
+      this.server = new WebSocketServer(this.url, this.abortController.signal);
+
+      this.server.addEventListener("client:open", () => {
+        const log3: Logger = log2.sub("client:open");
+        log3(WebSocketClientServer.prototype.sendOutgoingMessages.name);
+        this.sendOutgoingMessages();
+      });
+      this.server.addEventListener("client:message", (event: Event) => {
+        const log3: Logger = log2.sub("client:message");
+        if (!(event instanceof WebSocketClientMessageEvent)) {
+          throw new Error("Expected WebSocketClientMessageEvent");
+        }
+        const message: LocalMultiplexMessage = JSON.parse(
+          event.data.clientEvent.data,
+        );
+        log3(`received message ${ss(message)} from ${s(event.data.url)}`);
+
+        log3(WebSocketClientServer.prototype.dispatchEvent.name);
+        this.dispatchEvent(new MessageEvent("message", { data: message }));
+
+        log3(WebSocketClientServer.prototype.postMessage.name);
+        this.postMessage(message);
+      });
+      this.server.finished.then(() => {
+        const log3: Logger = log2.sub("this.server.finished");
+        log3("server finished");
+        this.state.transitionTo("server failed");
+      });
+
+      return this.state.transitionTo("server");
+    } catch (error) {
+      const log3: Logger = log2.sub("catch");
+      if (error instanceof Deno.errors.AddrInUse) {
+        log3("address in use");
+        return this.state.transitionTo("server failed");
       }
-      const message: LocalMultiplexMessage = JSON.parse(
-        event.data.clientEvent.data,
-      );
-      this.dispatchEvent(new MessageEvent("message", { data: message }));
-    });
-    this.server.finished.then(() => {
-      this.state.transitionTo("server failed");
-    });
-
-    return this.state.transitionTo("server");
+      throw error;
+    }
   }
 
   private cleanupAndStartConnecting() {
+    const log2: Logger = this.log1.sub(
+      WebSocketClientServer.prototype.cleanupAndStartConnecting.name,
+    );
+    log2(WebSocketClientServer.prototype.cleanup.name);
     this.cleanup();
+
+    log2(`connecting to ${s(this.url)}...`);
     this.ws = new WebSocket(this.url);
     this.ws.addEventListener("open", () => {
+      const log3: Logger = log2.sub("open");
+      log3("connected");
       this.state.transitionTo("client");
     });
-    this.ws.addEventListener("error", () => {
+    this.ws.addEventListener("error", (event) => {
+      const log3: Logger = log2.sub("error");
+      log3(`event: ${ss(event)}`);
       this.state.transitionTo("client failed");
     });
     this.ws.addEventListener("close", () => {
+      const log3: Logger = log2.sub("close");
+      log3("closed");
       this.state.transitionTo("client failed");
+    });
+    this.ws.addEventListener("message", (event: Event) => {
+      const log3: Logger = log2.sub("message");
+      if (!(event instanceof MessageEvent)) {
+        throw new Error("Expected MessageEvent");
+      }
+      const message: LocalMultiplexMessage = JSON.parse(event.data);
+      log3(`received message ${ss(message)}`);
+
+      log3(WebSocketClientServer.prototype.dispatchEvent.name);
+      this.dispatchEvent(new MessageEvent("message", { data: message }));
     });
   }
 
@@ -276,12 +326,32 @@ export class WebSocketClientServer extends EventTarget implements Disposable {
   }
 
   postMessage(message: LocalMultiplexMessage) {
+    const log1 = this.log1.sub(
+      WebSocketClientServer.prototype.postMessage.name,
+    );
+    log1(`message: ${ss(message)}`);
+
+    log1(WebSocketClientServer.prototype.postMessageLocal.name);
+    this.postMessageLocal(message);
+
+    this.outgoingMessages.push(message);
+    this.sendOutgoingMessages();
+  }
+
+  private postMessageLocal(message: LocalMultiplexMessage) {
+    const log1 = this.log1.sub(
+      WebSocketClientServer.prototype.postMessageLocal.name,
+    );
     const channelSet: Set<WebSocketBroadcastChannel> = this
       .getChannelSetOrEmpty(message.channel);
+    log1("channelSet.size", channelSet.size);
     for (const channel of channelSet) {
-      if (channel === message.from) {
+      if (channel.uuid === message.from) {
+        log1(`skipping message to self ${s(channel.uuid)}`);
         continue;
       }
+
+      log1(`dispatching message to channel ${s(channel.uuid)}`);
       channel.dispatchEvent(
         new MessageEvent("message", { data: message.message }),
       );

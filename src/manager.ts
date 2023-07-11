@@ -44,6 +44,7 @@ export class Manager {
         return new g.BroadcastChannel(name) as BroadcastChannelIsh;
       }
     }
+
     // Instantiate a WebSocketBroadcastChannel.
     const clientServer: WebSocketClientServer = this.ensureClientServer(
       IdUrl.of(url),
