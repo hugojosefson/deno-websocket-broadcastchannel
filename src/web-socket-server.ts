@@ -95,6 +95,9 @@ export class WebSocketServer extends EventTarget implements Deno.Closer {
         port: getPortNumber(url),
         hostname: url.hostname,
         signal: this.abortController.signal,
+        onListen: ({ hostname, port }) => {
+          log2(`server is listening on ${hostname}:${port}`);
+        },
       },
       this.handleIncomingWs.bind(this),
     );
