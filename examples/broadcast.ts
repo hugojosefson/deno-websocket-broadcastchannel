@@ -3,7 +3,7 @@ import "../polyfill.ts";
 
 const pid = Deno.pid;
 const pidLastDigit = pid % 10;
-const delay = pidLastDigit * 1000;
+const delay = (pidLastDigit || 10) * 1000;
 
 const log = (s: string, ...args: unknown[]) => {
   console.log(`[broadcast.ts#${pid}] ${s}`, ...args);
