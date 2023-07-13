@@ -50,10 +50,10 @@ describe("websocket-broadcastchannel", () => {
           ],
           async ([bc0, bc1]) => {
             const receivedPromise0 = new Promise<string>((resolve) => {
-              bc0.onmessage = (e) => resolve(e.data);
+              bc0.onmessage = (e) => resolve((e as MessageEvent).data);
             });
             const receivedPromise1 = new Promise<string>((resolve) => {
-              bc1.onmessage = (e) => resolve(e.data);
+              bc1.onmessage = (e) => resolve((e as MessageEvent).data);
             });
             bc0.postMessage("test from bc0");
             bc1.postMessage("test from bc1");
@@ -97,8 +97,8 @@ describe("websocket-broadcastchannel", () => {
             let receivedCount = 0;
             const receivedMessages: string[][] = [[], [], []];
             const collectMessages =
-              (index: number): (e: MessageEvent<string>) => void => (e) => {
-                receivedMessages[index].push(e.data);
+              (index: number): (e: Event) => void => (e) => {
+                receivedMessages[index].push((e as MessageEvent<string>).data);
                 receivedCount++;
                 if (receivedCount === expectedCount) {
                   doneDeferred.resolve();
@@ -143,16 +143,20 @@ describe("websocket-broadcastchannel", () => {
             const chat2ReceivedMessages: string[][] = [[], []];
             const chat3ReceivedMessages: string[][] = [[], [], []];
             const collectChat2Messages =
-              (index: number): (e: MessageEvent<string>) => void => (e) => {
-                chat2ReceivedMessages[index].push(e.data);
+              (index: number): (e: Event) => void => (e) => {
+                chat2ReceivedMessages[index].push(
+                  (e as MessageEvent<string>).data,
+                );
                 chat2ReceivedCount++;
                 if (chat2ReceivedCount === chat2ExpectedCount) {
                   chat2DoneDeferred.resolve();
                 }
               };
             const collectChat3Messages =
-              (index: number): (e: MessageEvent<string>) => void => (e) => {
-                chat3ReceivedMessages[index].push(e.data);
+              (index: number): (e: Event) => void => (e) => {
+                chat3ReceivedMessages[index].push(
+                  (e as MessageEvent<string>).data,
+                );
                 chat3ReceivedCount++;
                 if (chat3ReceivedCount === chat3ExpectedCount) {
                   chat3DoneDeferred.resolve();

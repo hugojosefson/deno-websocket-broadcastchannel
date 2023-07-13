@@ -92,16 +92,18 @@ function processLineForImport(
   publishUrl: string,
 ): (line: string) => string[] {
   return (line: string): string[] => {
-    const match = line.match(/\sfrom\s+"(\..*)"/);
+    const importRegex = /((\sfrom|\bimport)\s+)"(\..*)"/;
+    const match: string[] | null = line.match(importRegex);
     if (match) {
-      const importPath = match[1];
+      const importFrom = match[1];
+      const importPath = match[3];
       const step1: string =
         (new URL(importPath, `file://${inputFilePath}`)).pathname;
-      const gitRoot = (new URL("../", import.meta.url)).pathname;
+      const gitRoot: string = (new URL("../", import.meta.url)).pathname;
       const step2: string = relative(gitRoot, step1);
       return [line.replace(
-        /\sfrom\s+"(\..*)"/,
-        ` from "${publishUrl}/${step2}"`,
+        importRegex,
+        `${importFrom}"${publishUrl}/${step2}"`,
       )];
     }
     return [line];

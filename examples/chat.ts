@@ -1,11 +1,6 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env=DEBUG
-import {
-  BroadcastChannelIsh,
-  createBroadcastChannel,
-  Logger,
-  logger,
-  WebSocketBroadcastChannel,
-} from "../mod.ts";
+import "../polyfill.ts";
+import { Logger, logger, WebSocketBroadcastChannel } from "../mod.ts";
 
 const log: Logger = logger(import.meta.url);
 
@@ -14,10 +9,9 @@ const log: Logger = logger(import.meta.url);
  */
 async function main() {
   log("Starting...");
-  const chat: BroadcastChannelIsh = createBroadcastChannel(
-    "chat",
-  );
+  const chat: BroadcastChannel = new BroadcastChannel("chat");
 
+  chat.onmessage;
   if (chat instanceof WebSocketBroadcastChannel) {
     console.error(`
 ===============================================================================

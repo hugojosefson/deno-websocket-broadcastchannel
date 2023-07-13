@@ -6,7 +6,7 @@ import { WebSocketBroadcastChannel } from "./web-socket-broadcast-channel.ts";
  */
 export interface BroadcastChannelIsh extends EventTarget {
   readonly name: string;
-  onmessage: ((ev: MessageEvent) => void) | null;
+  onmessage: ((ev: Event) => void) | null;
   onmessageerror: ((ev: Event) => void) | null;
   postMessage(message: unknown): void;
   close(): void;

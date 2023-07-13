@@ -2,7 +2,7 @@
 
 An implementation of
 [BroadcastChannel](https://developer.mozilla.org/docs/Web/API/BroadcastChannel)
-for Deno, that uses
+for Deno CLI, that uses
 [WebSocket](https://developer.mozilla.org/docs/Web/API/WebSocket)s to
 communicate between processes on the same host.
 
@@ -17,7 +17,8 @@ BroadcastChannel, will let you do so.
 
 (At least until Deno will
 [Support cross process BroadcastChannel #10750](https://github.com/denoland/deno/issues/10750)
-in the `deno` CLI itself.)
+in the `deno` CLI itself, which is planned, but blocked on
+[an upstream issue](https://github.com/tokio-rs/mio/pull/1667).)
 
 ## Requirements
 
@@ -37,10 +38,30 @@ For specifics on what this module `export`s, see the auto-generated API docs at
 
 ## Example usage
 
-Instead of using the built-in `BroadcastChannel` constructor, use this module's
-`createBroadcastChannel(name)` function.
+### With BroadcastChannel polyfill
 
-It will either:
+The easiest way to use this module, is to use the included polyfill.
+
+Import it as early as possible in your code, before any other imports that may
+use `BroadcastChannel`.
+
+```typescript
+import "https://deno.land/x/websocket_broadcastchannel/polyfill.ts";
+
+const channel = new BroadcastChannel("my-channel");
+// Now use the channel as usual.
+```
+
+The polyfill does nothing if `BroadcastChannel` is already defined (on Deno
+Deploy), and otherwise defines a global `BroadcastChannel` to use this module's
+implementation.
+
+### Without polyfill
+
+For finer control, you may use the `createBroadcastChannel(name)` function,
+instead of `new BroadcastChannel(name)` via the polyfill.
+
+Calling the `createBroadcastChannel(name)` function will either:
 
 - return a `BroadcastChannel` object if available (when running in Deno Deploy),
   or
@@ -58,13 +79,10 @@ const channel = createBroadcastChannel("my-channel");
 A small example, that you can run in several terminals on the same host, and see
 messages broadcast between them.
 
-This uses this module's
-[createBroadcastChannel(name)](https://deno.land/x/websocket_broadcastchannel/mod.ts?s=createBroadcastChannel)
-function to create the relevant `BroadcastChannel` object, and then uses the
-`BroadcastChannel` API as usual.
+This uses the polyfill, so the code can use the `BroadcastChannel` API as usual.
 
 ```typescript
-import { createBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
+import "https://deno.land/x/websocket_broadcastchannel/polyfill.ts";
 
 const pid = Deno.pid;
 const pidLastDigit = pid % 10;
@@ -77,11 +95,11 @@ const log = (s: string, ...args: unknown[]) => {
 log("run this in multiple terminals on the same host, to see it work");
 
 log("starting...");
-const testChannel = createBroadcastChannel("test");
+const testChannel = new BroadcastChannel("test");
 log("testChannel.constructor.name", testChannel.constructor.name);
 
-testChannel.onmessage = (event: MessageEvent<unknown>) => {
-  log("onmessage event.data =", event.data);
+testChannel.onmessage = (event: Event) => {
+  log("onmessage event.data =", (event as MessageEvent).data);
 };
 
 testChannel.onmessageerror = (event: Event) => {
@@ -108,8 +126,7 @@ deno run    \
 ### Server example from Deno Deploy docs
 
 This is the example from Deno Deploy's documentation page for BroadcastChannel,
-but now using this module's `await createBroadcastChannel(name)` instead of the
-built-in `new BroadcastChannel(name)`.
+but now with the addition of this module's polyfill.
 
 Original:
 
@@ -118,17 +135,17 @@ https://deno.com/deploy/docs/runtime-broadcast-channel#example
 Adapted to use this module:
 
 ```typescript
+import "https://deno.land/x/websocket_broadcastchannel/polyfill.ts";
 import { serve } from "https://deno.land/std@0.194.0/http/server.ts";
-import { createBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
 
 const messages: string[] = [];
 // Create a new broadcast channel named earth.
-const channel = createBroadcastChannel("earth");
+const channel = new BroadcastChannel("earth");
 // Set onmessage event handler.
-channel.onmessage = (event: MessageEvent) => {
+channel.onmessage = (event: Event) => {
   // Update the local state when other instances
   // send us a new message.
-  messages.push(event.data);
+  messages.push((event as MessageEvent).data);
 };
 
 function handler(req: Request): Response {
@@ -170,15 +187,12 @@ serve(handler, { port: parseInt(Deno.env.get("PORT") ?? "8080", 10) });
 An example chat application, that you can run in several terminals on the same
 host, and see the messages broadcast between them.
 
-This uses the
-[createBroadcastChannel](https://deno.land/x/websocket_broadcastchannel/mod.ts?s=createBroadcastChannel)
-function to create the relevant `BroadcastChannel` object, and then uses the
-`BroadcastChannel` API as usual.
+This also uses the polyfill, so the code can use the `BroadcastChannel` API as
+usual.
 
 ```typescript
+import "https://deno.land/x/websocket_broadcastchannel/polyfill.ts";
 import {
-  BroadcastChannelIsh,
-  createBroadcastChannel,
   Logger,
   logger,
   WebSocketBroadcastChannel,
@@ -191,10 +205,9 @@ const log: Logger = logger(import.meta.url);
  */
 async function main() {
   log("Starting...");
-  const chat: BroadcastChannelIsh = createBroadcastChannel(
-    "chat",
-  );
+  const chat: BroadcastChannel = new BroadcastChannel("chat");
 
+  chat.onmessage;
   if (chat instanceof WebSocketBroadcastChannel) {
     console.error(`
 ===============================================================================

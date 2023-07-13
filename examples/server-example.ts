@@ -1,15 +1,15 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env=PORT --watch
+import "../polyfill.ts";
 import { serve } from "https://deno.land/std@0.194.0/http/server.ts";
-import { createBroadcastChannel } from "../mod.ts";
 
 const messages: string[] = [];
 // Create a new broadcast channel named earth.
-const channel = createBroadcastChannel("earth");
+const channel = new BroadcastChannel("earth");
 // Set onmessage event handler.
-channel.onmessage = (event: MessageEvent) => {
+channel.onmessage = (event: Event) => {
   // Update the local state when other instances
   // send us a new message.
-  messages.push(event.data);
+  messages.push((event as MessageEvent).data);
 };
 
 function handler(req: Request): Response {
