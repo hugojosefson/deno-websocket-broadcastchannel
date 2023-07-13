@@ -2,16 +2,16 @@ import {
   beforeAll,
   describe,
   it,
-} from "https://deno.land/std@0.193.0/testing/bdd.ts";
+} from "https://deno.land/std@0.194.0/testing/bdd.ts";
 import {
   assertEquals,
   assertInstanceOf,
   assertStrictEquals,
-} from "https://deno.land/std@0.193.0/testing/asserts.ts";
+} from "https://deno.land/std@0.194.0/testing/asserts.ts";
 import { getAvailablePort } from "./get-available-port.ts";
 import { defaultWebSocketUrl } from "../src/default-websocket-url.ts";
 import { assertDifferentInstances, rejectOnTimeout } from "./fn.ts";
-import { deferred } from "https://deno.land/std@0.193.0/async/deferred.ts";
+import { deferred } from "https://deno.land/std@0.194.0/async/deferred.ts";
 import { using } from "../src/using.ts";
 import { createBroadcastChannel, WebSocketBroadcastChannel } from "../mod.ts";
 
