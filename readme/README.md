@@ -47,10 +47,7 @@ It will either:
 - return a `WebSocketBroadcastChannel` object (when running in Deno CLI).
 
 ```typescript
-import { createBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
-
-const channel = await createBroadcastChannel("my-channel");
-// Now use the channel as usual.
+"@@include(../examples/create-channel.ts)";
 ```
 
 ### Simple broadcast between processes

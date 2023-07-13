@@ -46,40 +46,52 @@ async function processText(
   }
   const forInclude = processLineForInclude(inputFilePath, publishUrl);
   const forImport = processLineForImport(inputFilePath, publishUrl);
+  const forDenoLintComments = processLineForDenoLintComments();
   return (await Promise.all(lines.map(
     async function (line: string) {
-      const lines1: string[] = (await forInclude(line)).split("\n");
-      const lines2: string[] = lines1.map(forImport);
-      return lines2.join("\n");
+      const lines1: string[] = await forInclude(line);
+      const lines2: string[] = lines1.flatMap(forImport);
+      const lines3: string[] = lines2.flatMap(forDenoLintComments);
+      return lines3.join("\n");
     },
   ))).join("\n");
 }
 
+/**
+ * Replaces any line with `@@include(...)`, with the contents of the file.
+ * @param inputFilePath
+ * @param publishUrl
+ */
 function processLineForInclude(
   inputFilePath: string,
   publishUrl: string,
-): (line: string) => Promise<string> {
-  return async (line: string): Promise<string> => {
+): (line: string) => Promise<string[]> {
+  return async (line: string): Promise<string[]> => {
     const match = line.match(/@@include\((.*)\)/);
     if (match) {
       const matchedPath = match[1];
       const includeFilePath = resolve(dirname(inputFilePath), matchedPath);
       const resolvedIncludeFilePath = await Deno.realPath(includeFilePath);
-      return await processText(
+      return (await processText(
         await Deno.readTextFile(resolvedIncludeFilePath),
         resolvedIncludeFilePath,
         publishUrl,
-      );
+      )).split("\n");
     }
-    return line;
+    return [line];
   };
 }
 
+/**
+ * Updates import statements to point to the published version of the file.
+ * @param inputFilePath
+ * @param publishUrl
+ */
 function processLineForImport(
   inputFilePath: string,
   publishUrl: string,
-): (line: string) => string {
-  return (line: string): string => {
+): (line: string) => string[] {
+  return (line: string): string[] => {
     const match = line.match(/\sfrom\s+"(\..*)"/);
     if (match) {
       const importPath = match[1];
@@ -87,15 +99,30 @@ function processLineForImport(
         (new URL(importPath, `file://${inputFilePath}`)).pathname;
       const gitRoot = (new URL("../", import.meta.url)).pathname;
       const step2: string = relative(gitRoot, step1);
-      return line.replace(
+      return [line.replace(
         /\sfrom\s+"(\..*)"/,
         ` from "${publishUrl}/${step2}"`,
-      );
+      )];
     }
-    return line;
+    return [line];
   };
 }
 
+/**
+ * Removes any deno-lint comments, and the whole line if that's all there is on a line.
+ */
+function processLineForDenoLintComments(): (line: string) => string[] {
+  return (line: string): string[] => {
+    if (line.trim().startsWith("// deno-lint")) {
+      return [];
+    }
+    return [line];
+  };
+}
+
+/**
+ * Run the program.
+ */
 if (import.meta.main) {
   await main();
 }

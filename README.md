@@ -49,7 +49,7 @@ It will either:
 ```typescript
 import { createBroadcastChannel } from "https://deno.land/x/websocket_broadcastchannel/mod.ts";
 
-const channel = await createBroadcastChannel("my-channel");
+const channel = createBroadcastChannel("my-channel");
 // Now use the channel as usual.
 ```
 

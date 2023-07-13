@@ -85,6 +85,24 @@
     "https://deno.land/x/run_simple@2.1.0/mod.ts": "107de176c82574d128164e31ad7811a03ef85d67919061eed3b8f3bcecec1885",
     "https://deno.land/x/run_simple@2.1.0/src/fn.ts": "1faf24c00a2676c717f99c5e2d2ff9ccee6191fb09b94496522f9700af7acd15",
     "https://deno.land/x/run_simple@2.1.0/src/os.ts": "47820a9a43f99006ef8e6a0c4c353406cda1155e18b6ced50d0863c2a11863e9",
-    "https://deno.land/x/run_simple@2.1.0/src/run.ts": "c7ce54de495dd4cc171adddb3e9412ad90dac8b6f44f46439119b7aa309ee6e0"
+    "https://deno.land/x/run_simple@2.1.0/src/run.ts": "c7ce54de495dd4cc171adddb3e9412ad90dac8b6f44f46439119b7aa309ee6e0",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/mod.ts": "e44529f4ff0edbd58305818e90f7691eb3c5964d558b77fcadccc499f0c506fb",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/client-servers.ts": "d3c78434a1e81038c8618f4566079d828e05edfdfd2fa0871e910bbc5e9f8fac",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/create-broadcast-channel.ts": "840de6253d02dca04a5bc672149e764c85f097c76e4401ce0a2e2916dd01bf95",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/default-websocket-url.ts": "7944c870318531a282d56b9b2a092f9b36bfcdd447fdc9152b7e903c5204538a",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/fn.ts": "b07860c20fc0a65bf1c711516edc38e1029c2da83d4651ca835e915dcfc62d5e",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/id-url-channel.ts": "877a149e959d035c413cf3b467289c57ba9559717293370e390ff687ff4b5fc2",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/id-url.ts": "c84e60eaca2276fb9ae838d9bc87d5b44055a2665725f964b55dcea12006334c",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/log.ts": "ad8e42ce8815eee79c266a8499b68edb90dc8c4c1e1a8dc2bc6c2b5a28b8d68f",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/multiplex-message.ts": "18eaca537729a98701d863a19be02c363f591023b412c4a952d482f55d1d1a74",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/one-time-fuse.ts": "5a4d3b22432ece6b3703888b0accd48cfee189f38ca8d7be50b21ec819eff4db",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/promise-queue.ts": "fcf71f409244afdb84ae2b7f604db24157e2a8830d4c8c48c42d68aa9551f0b0",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/serve-web-socket.ts": "c2a359115d705feb611a26d086f7032331d11d12a7bad7a97419a90f13bdd5bc",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/state-machine.ts": "b756980b96ad36fdf65e6fc467a09b4a70f98a827e6c2151ddf3741444114c83",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/types.ts": "f6313d46bf45af9da7d89f705bb6f02a7d66f69058e7b3548012d3ce5ae39852",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/using.ts": "93c2b32b9d2e955b1b3078e6ee576e80dfa01ea8965ce49f8eaff13d33655393",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/web-socket-broadcast-channel.ts": "7ac8e8a0eb4fb88fd85e1f1098216f8a15a530ad5987c38ecb8e8cc6ff589941",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/web-socket-client-server.ts": "51606abf77e669448b6b2a37c3d068b56bf591246507701228e6b92e035d5324",
+    "https://deno.land/x/websocket_broadcastchannel@0.5.0/src/web-socket-server.ts": "08326428496176b0b4089b5ac1f702ddc9ddc12f3859024a2e8edfa33656c709"
   }
 }
