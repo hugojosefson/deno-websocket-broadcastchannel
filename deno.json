@@ -2,7 +2,7 @@
   "tasks": {
     "all": "deno fmt && deno lint && deno task check && deno task readme && deno task test",
     "all-reload": "deno fmt && deno lint && deno task check --reload && deno task test --reload",
-    "check": "sh -c '$(command -v fd || command -v fdfind) '\"'\"'\\.(mj|j|t)sx?$'\"'\"' --hidden --exec deno check {}'",
+    "check": "sh -c '$(command -v fd || command -v fdfind) '\"'\"'\\.(mj|j|t)sx?$'\"'\"' --hidden --threads=1 --exec deno check {}'",
     "test": "deno test --allow-run --allow-net --allow-env=VERBOSE,DEBUG",
     "readme": "touch README.md && chmod +w README.md && ./readme/generate-readme.ts readme/README.md https://deno.land/x/websocket_broadcastchannel > README.md && deno fmt README.md && chmod -w README.md",
     "readme-html": "deno task readme && sh -c 'docker run --rm -i hugojosefson/markdown <README.md | sed -E \"s|https://deno.land/x/websocket_broadcastchannel/|https://raw.githubusercontent.com/hugojosefson/deno-websocket-broadcastchannel/$(git rev-parse --abbrev-ref HEAD)/|g\" >README.html'",
