@@ -1,9 +1,12 @@
 /**
- * Similar to TC39 proposal for `using` blocks.
+ * Similar to the TC39 proposal for `using` blocks, named [Explicit Resource
+ * Management](https://github.com/tc39/proposal-explicit-resource-management).
  *
- * Give it a bunch of functions that each create a resource, and a function that uses those resources.
- * It will call the resource-creating functions, and pass the resources to the using function.
- * Then "finally" it will [Symbol.dispose]?.(), await [Symbol.asyncDispose]?.(), and await close?.() all the resources.
+ * Give this a bunch of functions that each create a resource
+ * (`resourceFactories`), and a function that uses those resources (`fn`). It
+ * will call the `resourceFactories`, then pass their resources to `fn`. Then
+ * "finally" it will `[Symbol.dispose]?.()`, `await [Symbol.asyncDispose]?.()`,
+ * and `await close?.()` all the resources.
  */
 export async function using<
   T,
