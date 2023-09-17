@@ -27,8 +27,8 @@ beforeAll(() => {
 describe("websocket-broadcastchannel", () => {
   describe("in same process", () => {
     describe("2 instances, same channel name", () => {
-      it("should create them", async () => {
-        await using(
+      it("should create them", () => {
+        using(
           [
             () => createBroadcastChannel("chat", url),
             () => createBroadcastChannel("chat", url),
@@ -42,8 +42,8 @@ describe("websocket-broadcastchannel", () => {
           },
         );
       });
-      it("should send one message from each, to the other", async () => {
-        await using(
+      it("should send one message from each, to the other", () => {
+        using(
           [
             () => createBroadcastChannel("chat", url),
             () => createBroadcastChannel("chat", url),
@@ -68,8 +68,8 @@ describe("websocket-broadcastchannel", () => {
       });
     });
     describe("3 instances, same channel name", () => {
-      it("should create them", async () => {
-        await using(
+      it("should create them", () => {
+        using(
           [
             () => createBroadcastChannel("chat", url),
             () => createBroadcastChannel("chat", url),
@@ -84,8 +84,8 @@ describe("websocket-broadcastchannel", () => {
           },
         );
       });
-      it("should send one message from each, to the others", async () => {
-        await using(
+      it("should send one message from each, to the others", () => {
+        using(
           [
             () => createBroadcastChannel("chat", url),
             () => createBroadcastChannel("chat", url),
@@ -124,8 +124,8 @@ describe("websocket-broadcastchannel", () => {
     });
 
     describe("2 instances w/ channel name 'chat2' and 3 instances w/ channel name 'chat3'", () => {
-      it("should send one message from each, to the others of the same name", async () => {
-        await using(
+      it("should send one message from each, to the others of the same name", () => {
+        using(
           [
             () => createBroadcastChannel("chat2", url),
             () => createBroadcastChannel("chat2", url),
