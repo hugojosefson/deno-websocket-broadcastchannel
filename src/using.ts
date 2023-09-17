@@ -60,11 +60,11 @@ export type Disposable = { [Symbol.dispose](): void };
 /** A resource that can be asynchronously disposed. */
 export type AsyncDisposable = { [Symbol.asyncDispose](): Promise<void> };
 
-/** A resource that can be disposed, asynchronously disposed, or closed. */
+/** A resource that can be synchronously or asynchronously, disposed or closed. */
 export type Resource =
-  | Deno.Closer
   | Disposable
-  | AsyncDisposable;
+  | AsyncDisposable
+  | { close(): void | Promise<void> };
 
 /** A function that creates a resource. */
 export type ResourceFactory<R extends Resource> = () => R | Promise<R>;
