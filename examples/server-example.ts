@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-net --allow-env=PORT --watch
 import "../polyfill.ts";
-import { serve } from "https://deno.land/std@0.194.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.201.0/http/server.ts";
 
 const messages: string[] = [];
 // Create a new broadcast channel named earth.
