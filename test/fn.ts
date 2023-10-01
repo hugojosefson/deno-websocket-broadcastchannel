@@ -1,4 +1,4 @@
-import { assertNotStrictEquals } from "https://deno.land/std@0.201.0/testing/asserts.ts";
+import { assertNotStrictEquals } from "https://deno.land/std@0.203.0/testing/asserts.ts";
 
 export const DEFAULT_TEST_TIMEOUT = 2000;
 

@@ -1,7 +1,7 @@
 import {
   assertNotStrictEquals,
   assertStrictEquals,
-} from "https://deno.land/std@0.201.0/testing/asserts.ts";
+} from "https://deno.land/std@0.203.0/testing/asserts.ts";
 import { IdUrl } from "../src/id-url.ts";
 
 Deno.test("IdUrl", () => {

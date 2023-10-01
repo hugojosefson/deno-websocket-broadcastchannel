@@ -1,4 +1,4 @@
-import { basename, extname } from "https://deno.land/std@0.201.0/path/mod.ts";
+import { basename, extname } from "https://deno.land/std@0.203.0/path/mod.ts";
 import type { Debug } from "https://deno.land/x/quiet_debug@v1.0.0/mod.ts";
 import { debug } from "https://deno.land/x/quiet_debug@v1.0.0/mod.ts";
 
